@@ -132,10 +132,10 @@ export class CrmChatClient {
     params: Record<string, unknown>,
   ): Promise<unknown> {
     const res = await this.request<TelegramRawResponse>(
-      `/workspaces/${workspaceId}/telegram-accounts/${accountId}/raw`,
+      `/workspaces/${workspaceId}/telegram-accounts/${accountId}/call/${encodeURIComponent(method)}`,
       {
         method: "POST",
-        body: JSON.stringify({ method, params }),
+        body: JSON.stringify({ params }),
       },
     );
     return res.result;

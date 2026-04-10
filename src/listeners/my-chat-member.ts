@@ -92,13 +92,20 @@ export function registerMyChatMemberListener(
     const channelTitle = "title" in chat ? chat.title : `Chat ${channelId}`;
 
     if (action === "promoted") {
+      // Ignore events where "from" is a bot (including ourselves)
+      if (from.is_bot) return;
+
       const session = config.getSession(from.id);
 
       if (!session) {
-        await ctx.telegram.sendMessage(
-          from.id,
-          `I've been added to ${channelTitle}! To sync subscribers, first connect your CRMChat account: send /start to me in DM.`,
-        );
+        try {
+          await ctx.telegram.sendMessage(
+            from.id,
+            `I've been added to ${channelTitle}! To sync subscribers, first connect your CRMChat account: send /start to me in DM.`,
+          );
+        } catch (err) {
+          console.log(`[my_chat_member] Could not DM user ${from.id}:`, String(err));
+        }
         return;
       }
 
@@ -143,10 +150,17 @@ export function registerMyChatMemberListener(
 
     if (action === "demoted") {
       config.removeChannelConfig(channelId);
-      await ctx.telegram.sendMessage(
-        from.id,
-        `I've been removed from ${channelTitle}. Sync stopped.`,
-      );
+      // Don't try to DM bots (including ourselves)
+      if (!from.is_bot) {
+        try {
+          await ctx.telegram.sendMessage(
+            from.id,
+            `I've been removed from ${channelTitle}. Sync stopped.`,
+          );
+        } catch (err) {
+          console.log(`[my_chat_member] Could not DM user ${from.id}:`, String(err));
+        }
+      }
     }
   });
 
