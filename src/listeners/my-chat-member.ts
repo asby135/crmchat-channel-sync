@@ -2,6 +2,7 @@ import { Markup, type Telegraf } from "telegraf";
 import type { ConfigStore } from "../config/store.js";
 import { CrmChatClient } from "../api/client.js";
 import { bulkSync } from "../handlers/sync.js";
+import { toMtprotoChannelId } from "../lib/telegram.js";
 
 // ── Exported helper (testable without Telegraf context) ──────────────
 
@@ -42,19 +43,6 @@ interface DialogsResult {
  * Resolve the MTProto accessHash for a channel by fetching recent dialogs
  * and finding the matching channel by ID.
  */
-/**
- * Convert Bot API channel/supergroup ID to MTProto channel ID.
- * Bot API adds -100 prefix to channel IDs: -100{channelId}
- */
-export function toMtprotoChannelId(botApiId: number): number {
-  const s = String(botApiId);
-  if (s.startsWith("-100")) {
-    return Number(s.slice(4));
-  }
-  // Already a positive MTProto ID or a regular group ID
-  return Math.abs(botApiId);
-}
-
 async function resolveAccessHash(
   client: CrmChatClient,
   workspaceId: string,
@@ -82,7 +70,7 @@ async function resolveAccessHash(
     console.log(`[resolveAccessHash] Got ${result.chats.length} chats, looking for ID ${mtprotoId}`);
     for (const chat of result.chats) {
       if (chat.id === mtprotoId && chat.accessHash) {
-        console.log(`[resolveAccessHash] Found! accessHash: ${chat.accessHash}`);
+        console.log("[resolveAccessHash] Found!");
         return chat.accessHash;
       }
     }
@@ -91,7 +79,7 @@ async function resolveAccessHash(
     console.log(`[resolveAccessHash] Channel not found. Chat IDs: ${chatIds}`);
   }
 
-  return "";
+  throw new Error(`Could not resolve accessHash for channel ${channelId}`);
 }
 
 // ── Listener registration ────────────────────────────────────────────

@@ -4,7 +4,7 @@ import type { Contact, CreateContactInput } from "../api/types.js";
 import type { ConfigStore } from "../config/store.js";
 import type { PropertyMapping } from "../config/types.js";
 import { sleep } from "../lib/rate-limiter.js";
-import { toMtprotoChannelId } from "../listeners/my-chat-member.js";
+import { toMtprotoChannelId } from "../lib/telegram.js";
 
 // ── Flood / rate-limit retry helpers ─────────────────────────────────
 

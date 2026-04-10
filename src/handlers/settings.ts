@@ -10,13 +10,18 @@ let callbackSeq = 0;
 const callbackCache = new Map<string, Record<string, string>>();
 
 function storeCallback(prefix: string, data: Record<string, string>): string {
+  if (callbackCache.size > 500) {
+    callbackCache.clear();
+  }
   const key = `${prefix}:${++callbackSeq}`;
   callbackCache.set(key, data);
   return key;
 }
 
 function lookupCallback(key: string): Record<string, string> | undefined {
-  return callbackCache.get(key);
+  const data = callbackCache.get(key);
+  if (data) callbackCache.delete(key);
+  return data;
 }
 
 // ── State machine for text input ────────────────────────────────────

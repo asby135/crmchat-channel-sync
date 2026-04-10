@@ -18,7 +18,9 @@ export class ConfigStore {
   }
 
   private enqueueSave(): void {
-    this._saveChain = this._saveChain.then(() => this._doSave());
+    this._saveChain = this._saveChain.then(() => this._doSave()).catch(err => {
+      console.error("[ConfigStore] Save failed:", err);
+    });
   }
 
   async load(): Promise<void> {
