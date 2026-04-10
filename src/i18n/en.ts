@@ -28,6 +28,7 @@ export const en = {
   syncExisting: (n: number) => `${n} already existed`,
   syncPrivate: (n: number) => `${n} private (skipped)`,
   syncFailedCount: (n: number) => `${n} failed`,
+  syncCheckCrm: "\nCheck your synced contacts in @crmchat_crm_bot.",
 
   // ── settings.ts ───────────────────────────────────────────────────
   settingsNeedConnect:

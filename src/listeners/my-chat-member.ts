@@ -190,8 +190,12 @@ export function registerMyChatMemberListener(
         ? progressMsg.message_id
         : undefined;
 
+    let lastProgressEdit = 0;
     const onProgress = async (synced: number, total: number) => {
       if (!msgId) return;
+      const now = Date.now();
+      if (synced < total && now - lastProgressEdit < 2000) return;
+      lastProgressEdit = now;
       try {
         await ctx.telegram.editMessageText(
           chatId,
@@ -232,6 +236,7 @@ export function registerMyChatMemberListener(
         l.syncExisting(result.existing),
         l.syncPrivate(result.private),
         l.syncFailedCount(result.failed),
+        l.syncCheckCrm,
       ].join("\n");
 
       if (msgId) {

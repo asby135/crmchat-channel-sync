@@ -30,6 +30,7 @@ export const ru: Locale = {
   syncExisting: (n: number) => `${n} уже существовали`,
   syncPrivate: (n: number) => `${n} скрытых (пропущено)`,
   syncFailedCount: (n: number) => `${n} с ошибкой`,
+  syncCheckCrm: "\nСинхронизированные контакты можно посмотреть в @crmchat_crm_bot.",
 
   // ── settings.ts ───────────────────────────────────────────────────
   settingsNeedConnect:

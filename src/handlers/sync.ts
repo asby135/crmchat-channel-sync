@@ -199,6 +199,7 @@ export async function bulkSync(options: {
     if (!user || !user.id || user.deleted) {
       result.private++;
       processed++;
+      if (onProgress) onProgress(processed, result.total);
       continue;
     }
 
@@ -206,6 +207,7 @@ export async function bulkSync(options: {
     if (existingTelegramIds.has(user.id)) {
       result.existing++;
       processed++;
+      if (onProgress) onProgress(processed, result.total);
       continue;
     }
 
@@ -242,11 +244,7 @@ export async function bulkSync(options: {
     }
 
     processed++;
-
-    // Fire progress callback every 200 subscribers (or on last)
-    if (onProgress && (processed % 200 === 0 || processed === result.total)) {
-      onProgress(processed, result.total);
-    }
+    if (onProgress) onProgress(processed, result.total);
 
     // Rate limit between CRM API create calls
     await sleep(100);
@@ -344,8 +342,13 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
         ? progressMsg.message_id
         : undefined;
 
+    let lastProgressEdit = 0;
     const onProgress = async (synced: number, total: number) => {
       if (!msgId) return;
+      // Throttle edits: update at most every 2 seconds, plus always on completion
+      const now = Date.now();
+      if (synced < total && now - lastProgressEdit < 2000) return;
+      lastProgressEdit = now;
       const ratio = total > 0 ? synced / total : 0;
       const bar = buildProgressBar(ratio);
       try {
@@ -385,6 +388,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
         l.syncExisting(result.existing),
         l.syncPrivate(result.private),
         l.syncFailedCount(result.failed),
+        l.syncCheckCrm,
       ].join("\n");
 
       if (msgId) {
