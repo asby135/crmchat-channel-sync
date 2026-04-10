@@ -59,7 +59,7 @@ export class CrmChatClient {
 
   async listWorkspaces(organizationId: string): Promise<Workspace[]> {
     return this.paginateAll<Workspace>(
-      `/organizations/${organizationId}/workspaces`,
+      `/workspaces?organizationId=${encodeURIComponent(organizationId)}`,
     );
   }
 
