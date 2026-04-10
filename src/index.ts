@@ -23,6 +23,13 @@ async function main() {
   registerMyChatMemberListener(bot, config);
   registerChatMemberListener(bot, config);
 
+  // Register bot commands menu with Telegram
+  await bot.telegram.setMyCommands([
+    { command: "start", description: "Connect your CRMChat account" },
+    { command: "sync", description: "Sync channel subscribers" },
+    { command: "settings", description: "Configure property mappings" },
+  ]);
+
   console.log("Channel Parser Bot starting...");
   await bot.launch({
     allowedUpdates: [
