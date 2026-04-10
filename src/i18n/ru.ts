@@ -66,9 +66,8 @@ export const ru: Locale = {
   settingsJoinTextPrompt: "Введи значение для установки при ВСТУПЛЕНИИ в этот канал:",
   settingsLeaveTextPrompt: "Введи значение для установки при ВЫХОДЕ из этого канала:",
   settingsMappingSaved: (propName: string, joinLabel: string, leaveLabel: string) =>
-    `Кастомные поля сохранены!\n${propName}: ${joinLabel} (вступление) / ${leaveLabel} (выход). 
-  
-  Теперь в CRMChat ты можешь настроить автоматические рассылки как новым подписчикам, так и отписавшимся. Для этого в @crmchat_crm_bot открой раздел Рассылки > Лиды из CRM. `,
+    `Кастомные поля сохранены!\n${propName}: ${joinLabel} (вступление) / ${leaveLabel} (выход).\n\n
+  После синхронизации в CRMChat ты можешь настроить автоматические рассылки как новым подписчикам, так и отписавшимся. Для этого в @crmchat_crm_bot открой раздел Рассылки > Лиды из CRM. `,
   settingsSessionExpiredCb: "Сессия истекла. Попробуй /settings ещё раз.",
 
   // ── my-chat-member.ts ─────────────────────────────────────────────

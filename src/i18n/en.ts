@@ -64,7 +64,8 @@ export const en = {
   settingsJoinTextPrompt: "Type the value to set when someone JOINS this channel:",
   settingsLeaveTextPrompt: "Type the value to set when someone LEAVES this channel:",
   settingsMappingSaved: (propName: string, joinLabel: string, leaveLabel: string) =>
-    `Custom property saved!\n${propName}: ${joinLabel} (join) / ${leaveLabel} (leave)\n\nYou can now set up automated outreach for new subscribers and unsubscribers in CRMChat. Go to @crmchat_crm_bot > Outreach > CRM Leads.`,
+    `Custom property saved!\n${propName}: ${joinLabel} (join) / ${leaveLabel} (leave)\n\n
+  After the sync you can set up automated outreach for new subscribers and unsubscribers in CRMChat. Go to @crmchat_crm_bot > Outreach > CRM Leads.`,
   settingsSessionExpiredCb: "Session expired. Try /settings again.",
 
   // ── my-chat-member.ts ─────────────────────────────────────────────

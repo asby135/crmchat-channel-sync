@@ -363,6 +363,8 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
       }
     };
 
+    // Run sync in background to avoid Telegraf 90s callback timeout
+    void (async () => {
     try {
       const result = await bulkSync({
         client,
@@ -415,5 +417,6 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
         }
       }
     }
+    })(); // end background sync IIFE
   });
 }
