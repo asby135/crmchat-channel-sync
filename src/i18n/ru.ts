@@ -2,11 +2,11 @@ import type { Locale } from "./index.js";
 
 export const ru: Locale = {
   // ── start.ts ──────────────────────────────────────────────────────
-  welcome: "Привет! Отправь мне API-ключ CRMChat, чтобы начать. Найти его можно в Настройки > API-ключи.",
+  welcome: "Привет! Отправь мне API-ключ CRMChat, чтобы начать. Найти его можно в @crmchat_crm_bot > Настройки > API-ключи.",
   connectedToWorkspace: (name: string) =>
     `Подключено к рабочему пространству: ${name}! Теперь добавь меня админом в каналы, которые хочешь синхронизировать.`,
   alreadyConnected: (workspaceId: string) =>
-    `Ты подключён к рабочему пространству: ${workspaceId}. Используй /sync для синхронизации канала.`,
+    `Ты подключён к рабочему пространству: ${workspaceId}. Используй /sync для синхронизации канала, но сначала рекомендуем настроить кастомные поля в /settings.`,
   invalidApiKey: "Неверный API-ключ. Проверь Настройки > API-ключи в CRMChat.",
   apiUnreachable: "Не удалось связаться с CRMChat API. Попробуй ещё раз.",
   noOrganizations: "Организации для этого API-ключа не найдены.",
@@ -41,8 +41,8 @@ export const ru: Locale = {
   settingsSessionExpired: "Сессия истекла. Отправь /start для переподключения.",
   settingsNoChannelsConfigured: "Каналы не настроены.",
   settingsForChannel: (title: string) => `Настройки ${title}:`,
-  settingsProperty: (name: string) => `Свойство: ${name}`,
-  settingsPropertyNotSet: "Свойство: не задано",
+  settingsProperty: (name: string) => `Кастомное поле: ${name}`,
+  settingsPropertyNotSet: "Кастомное поле: не задано",
   settingsOnJoin: (label: string) => `При вступлении: ${label}`,
   settingsOnLeave: (label: string) => `При выходе: ${label}`,
   settingsOnJoinNone: "При вступлении: \u2014",
@@ -51,21 +51,23 @@ export const ru: Locale = {
   settingsLastSyncNever: "Последняя синхронизация: никогда",
   settingsSubscribers: (value: string) => `Подписчиков: ${value}`,
   settingsSubscribersUnknown: "Подписчиков: неизвестно",
-  settingsBtnSetMapping: "Настроить свойство",
-  settingsBtnRemoveMapping: "Удалить привязку",
+  settingsBtnSetMapping: "Настроить кастомные поля",
+  settingsBtnRemoveMapping: "Удалить кастомные поля",
   settingsBtnBack: "Назад",
   settingsBtnCancel: "Отмена",
-  settingsCouldNotLoadProps: "Не удалось загрузить свойства. Попробуй позже.",
+  settingsCouldNotLoadProps: "Не удалось загрузить кастомные поля. Попробуй позже.",
   settingsNoConfigurableProps:
-    "Настраиваемые свойства не найдены. Сначала создай пользовательское свойство типа single-select или text в CRMChat.",
-  settingsSelectProperty: "Выбери свойство для отслеживания вступлений/выходов:",
-  settingsPropertyNotFound: "Свойство не найдено. Попробуй ещё раз.",
+    "Кастомные поля не найдены. Сначала создай кастомное поле типа single-select или text в @crmchat_crm_bot > Кастомные поля",
+  settingsSelectProperty: "Выбери кастомное поле для установки для новых подписчиков/отписавшихся:",
+  settingsPropertyNotFound: "Кастомное поле не найдено. Попробуй ещё раз.",
   settingsJoinValuePrompt: "Какое значение при ВСТУПЛЕНИИ?",
   settingsLeaveValuePrompt: "Какое значение при ВЫХОДЕ?",
   settingsJoinTextPrompt: "Введи значение для установки при ВСТУПЛЕНИИ в этот канал:",
   settingsLeaveTextPrompt: "Введи значение для установки при ВЫХОДЕ из этого канала:",
   settingsMappingSaved: (propName: string, joinLabel: string, leaveLabel: string) =>
-    `Привязка свойства сохранена!\n${propName}: ${joinLabel} (вступление) / ${leaveLabel} (выход)`,
+    `Кастомные поля сохранены!\n${propName}: ${joinLabel} (вступление) / ${leaveLabel} (выход). 
+  
+  Теперь в CRMChat ты можешь настроить автоматические рассылки как новым подписчикам, так и отписавшимся. Для этого в @crmchat_crm_bot открой раздел Рассылки > Лиды из CRM. `,
   settingsSessionExpiredCb: "Сессия истекла. Попробуй /settings ещё раз.",
 
   // ── my-chat-member.ts ─────────────────────────────────────────────
@@ -83,6 +85,6 @@ export const ru: Locale = {
   syncNowResolveFailed: (reason: string) =>
     `Не удалось определить канал. ${reason}`,
   settingsFirstMsg:
-    "Используй /settings для настройки привязки свойств, затем возвращайся.",
+    "Используй /settings для настройки кастомных полей, затем возвращайся.",
   notNowMsg: "Без проблем! Синхронизировать можно в любое время через /sync.",
 };
