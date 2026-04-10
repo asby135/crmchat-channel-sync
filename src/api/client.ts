@@ -117,9 +117,9 @@ export class CrmChatClient {
 
   // ── Properties ─────────────────────────────────────────────────────
 
-  async listProperties(workspaceId: string): Promise<Property[]> {
+  async listProperties(workspaceId: string, objectType = "contacts"): Promise<Property[]> {
     return this.paginateAll<Property>(
-      `/workspaces/${workspaceId}/properties`,
+      `/workspaces/${workspaceId}/properties/${objectType}`,
     );
   }
 
