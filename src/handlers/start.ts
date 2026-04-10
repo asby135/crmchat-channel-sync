@@ -24,6 +24,7 @@ export async function validateAndCreateSession(
     if (err instanceof ApiAuthError) {
       return { error: "Invalid API key. Check Settings > API Keys in CRMChat." };
     }
+    console.error("CRMChat API error:", err);
     return { error: "Could not reach CRMChat API. Please try again." };
   }
 

@@ -46,7 +46,7 @@ export class CrmChatClient {
   private readonly apiKey: string;
   private readonly baseUrl: string;
 
-  constructor(apiKey: string, baseUrl = "https://api.crmchat.ai/v1") {
+  constructor(apiKey: string, baseUrl = process.env.CRMCHAT_API_URL ?? "https://api.crmchat.ai/v1") {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl.replace(/\/+$/, ""); // strip trailing slashes
   }
