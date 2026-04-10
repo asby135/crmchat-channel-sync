@@ -53,11 +53,11 @@ async function resolveAccessHash(
     accountId,
     "messages.getDialogs",
     {
-      offset_date: 0,
-      offset_id: 0,
-      offset_peer: { _: "inputPeerEmpty" },
+      offsetDate: 0,
+      offsetId: 0,
+      offsetPeer: { _: "inputPeerEmpty" },
       limit: 100,
-      hash: 0,
+      hash: "0",
     },
   );
 

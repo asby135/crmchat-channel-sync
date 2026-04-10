@@ -142,11 +142,11 @@ export async function bulkSync(options: {
         accountId,
         "channels.getParticipants",
         {
-          channel: { _: "inputChannel", channel_id: channelId, access_hash: accessHash },
+          channel: { _: "inputChannel", channelId, accessHash },
           filter: { _: "channelParticipantsRecent" },
           offset,
           limit,
-          hash: 0,
+          hash: "0",
         },
       ),
     );
