@@ -42,12 +42,28 @@ interface DialogsResult {
  * Resolve the MTProto accessHash for a channel by fetching recent dialogs
  * and finding the matching channel by ID.
  */
+/**
+ * Convert Bot API channel/supergroup ID to MTProto channel ID.
+ * Bot API adds -100 prefix to channel IDs: -100{channelId}
+ */
+export function toMtprotoChannelId(botApiId: number): number {
+  const s = String(botApiId);
+  if (s.startsWith("-100")) {
+    return Number(s.slice(4));
+  }
+  // Already a positive MTProto ID or a regular group ID
+  return Math.abs(botApiId);
+}
+
 async function resolveAccessHash(
   client: CrmChatClient,
   workspaceId: string,
   accountId: string,
   channelId: number,
 ): Promise<string> {
+  const mtprotoId = toMtprotoChannelId(channelId);
+  console.log(`[resolveAccessHash] Bot API ID: ${channelId}, MTProto ID: ${mtprotoId}`);
+
   const raw = await client.callTelegramRaw(
     workspaceId,
     accountId,
@@ -63,11 +79,16 @@ async function resolveAccessHash(
 
   const result = raw as DialogsResult;
   if (result.chats) {
+    console.log(`[resolveAccessHash] Got ${result.chats.length} chats, looking for ID ${mtprotoId}`);
     for (const chat of result.chats) {
-      if (chat.id === channelId && chat.accessHash) {
+      if (chat.id === mtprotoId && chat.accessHash) {
+        console.log(`[resolveAccessHash] Found! accessHash: ${chat.accessHash}`);
         return chat.accessHash;
       }
     }
+    // Log what IDs we got for debugging
+    const chatIds = result.chats.map(c => `${c.id}(${c._})`).join(", ");
+    console.log(`[resolveAccessHash] Channel not found. Chat IDs: ${chatIds}`);
   }
 
   return "";

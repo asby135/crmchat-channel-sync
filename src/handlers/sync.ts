@@ -4,6 +4,7 @@ import type { Contact, CreateContactInput } from "../api/types.js";
 import type { ConfigStore } from "../config/store.js";
 import type { PropertyMapping } from "../config/types.js";
 import { sleep } from "../lib/rate-limiter.js";
+import { toMtprotoChannelId } from "../listeners/my-chat-member.js";
 
 // ── Flood / rate-limit retry helpers ─────────────────────────────────
 
@@ -142,7 +143,7 @@ export async function bulkSync(options: {
         accountId,
         "channels.getParticipants",
         {
-          channel: { _: "inputChannel", channelId, accessHash },
+          channel: { _: "inputChannel", channelId: toMtprotoChannelId(channelId), accessHash },
           filter: { _: "channelParticipantsRecent" },
           offset,
           limit,
