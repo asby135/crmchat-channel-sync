@@ -5,6 +5,7 @@ import type { ConfigStore } from "../config/store.js";
 import type { PropertyMapping } from "../config/types.js";
 import { sleep } from "../lib/rate-limiter.js";
 import { toMtprotoChannelId } from "../lib/telegram.js";
+import { resolveAccountAndAccessHash } from "../lib/resolve-channel.js";
 
 // ── Flood / rate-limit retry helpers ─────────────────────────────────
 
@@ -305,6 +306,31 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
     const client = new CrmChatClient(channelConfig.apiKey);
     const channelTitle = channelConfig.channelTitle;
 
+    // Resolve accountId and accessHash if missing (e.g. saved at promotion time before sync_now)
+    let { accountId, accessHash } = channelConfig;
+    if (!accountId || !accessHash) {
+      try {
+        const resolved = await resolveAccountAndAccessHash(
+          client,
+          channelConfig.workspaceId,
+          channelId,
+        );
+        accountId = resolved.accountId;
+        accessHash = resolved.accessHash;
+        // Persist so we don't have to resolve again
+        config.setChannelConfig(channelId, {
+          ...channelConfig,
+          accountId,
+          accessHash,
+        });
+      } catch (err) {
+        await ctx.editMessageText(
+          `Sync failed for ${channelTitle}. ${err instanceof Error ? err.message : "Unknown error"}`,
+        );
+        return;
+      }
+    }
+
     // Send initial progress message
     const progressMsg = await ctx.editMessageText(
       `Syncing ${channelTitle}...\n0/? subscribers synced ${buildProgressBar(0)}`,
@@ -336,9 +362,9 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
       const result = await bulkSync({
         client,
         workspaceId: channelConfig.workspaceId,
-        accountId: channelConfig.accountId,
+        accountId,
         channelId: channelConfig.channelId,
-        accessHash: channelConfig.accessHash,
+        accessHash,
         propertyMapping: channelConfig.propertyMapping,
         onProgress,
       });

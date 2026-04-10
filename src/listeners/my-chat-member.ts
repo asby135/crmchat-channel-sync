@@ -2,7 +2,7 @@ import { Markup, type Telegraf } from "telegraf";
 import type { ConfigStore } from "../config/store.js";
 import { CrmChatClient } from "../api/client.js";
 import { bulkSync } from "../handlers/sync.js";
-import { toMtprotoChannelId } from "../lib/telegram.js";
+import { resolveAccountAndAccessHash } from "../lib/resolve-channel.js";
 
 // ── Exported helper (testable without Telegraf context) ──────────────
 
@@ -25,61 +25,6 @@ export function determineMyChatMemberAction(
   if (isNowRemoved) return "demoted";
 
   return "ignore";
-}
-
-// ── Access hash resolution ──────────────────────────────────────────
-
-interface DialogChat {
-  _: string;
-  id: number;
-  accessHash?: string;
-}
-
-interface DialogsResult {
-  chats?: DialogChat[];
-}
-
-/**
- * Resolve the MTProto accessHash for a channel by fetching recent dialogs
- * and finding the matching channel by ID.
- */
-async function resolveAccessHash(
-  client: CrmChatClient,
-  workspaceId: string,
-  accountId: string,
-  channelId: number,
-): Promise<string> {
-  const mtprotoId = toMtprotoChannelId(channelId);
-  console.log(`[resolveAccessHash] Bot API ID: ${channelId}, MTProto ID: ${mtprotoId}`);
-
-  const raw = await client.callTelegramRaw(
-    workspaceId,
-    accountId,
-    "messages.getDialogs",
-    {
-      offsetDate: 0,
-      offsetId: 0,
-      offsetPeer: { _: "inputPeerEmpty" },
-      limit: 100,
-      hash: "0",
-    },
-  );
-
-  const result = raw as DialogsResult;
-  if (result.chats) {
-    console.log(`[resolveAccessHash] Got ${result.chats.length} chats, looking for ID ${mtprotoId}`);
-    for (const chat of result.chats) {
-      if (chat.id === mtprotoId && chat.accessHash) {
-        console.log("[resolveAccessHash] Found!");
-        return chat.accessHash;
-      }
-    }
-    // Log what IDs we got for debugging
-    const chatIds = result.chats.map(c => `${c.id}(${c._})`).join(", ");
-    console.log(`[resolveAccessHash] Channel not found. Chat IDs: ${chatIds}`);
-  }
-
-  throw new Error(`Could not resolve accessHash for channel ${channelId}`);
 }
 
 // ── Listener registration ────────────────────────────────────────────
@@ -189,39 +134,24 @@ export function registerMyChatMemberListener(
       return;
     }
 
-    // Pick the first active Telegram account from the workspace
-    let accountId = "";
+    // Resolve account and accessHash
     const client = new CrmChatClient(session.apiKey);
+    let accountId: string;
+    let accessHash: string;
     try {
-      const accounts = await client.listTelegramAccounts(session.workspaceId);
-      const active = accounts.find((a) => a.status === "active");
-      if (active) accountId = active.id;
-    } catch {
-      // Leave as empty string; will fail below
-    }
-
-    if (!accountId) {
-      await ctx.answerCbQuery();
-      await ctx.editMessageText(
-        "No active Telegram account found in your workspace. Please add one in CRMChat first.",
-      );
-      return;
-    }
-
-    // Resolve the channel's accessHash via messages.getDialogs
-    let accessHash = "";
-    try {
-      accessHash = await resolveAccessHash(
+      const resolved = await resolveAccountAndAccessHash(
         client,
         session.workspaceId,
-        accountId,
         channelId,
       );
+      accountId = resolved.accountId;
+      accessHash = resolved.accessHash;
     } catch (err) {
-      console.error(
-        `[sync_now] Failed to resolve accessHash for channel ${channelId}:`,
-        err,
+      await ctx.answerCbQuery();
+      await ctx.editMessageText(
+        `Could not resolve channel. ${err instanceof Error ? err.message : "Unknown error"}`,
       );
+      return;
     }
 
     // Read title from the config saved at promotion time
