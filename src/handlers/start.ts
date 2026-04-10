@@ -96,13 +96,13 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
     }
   });
 
-  // Text handler: capture API key input
-  bot.on("text", async (ctx) => {
+  // Text handler: capture API key input (must call next() for non-matching messages)
+  bot.on("text", async (ctx, next) => {
     const text = ctx.message.text.trim();
-    if (!text.startsWith("sk_")) return;
+    if (!text.startsWith("sk_")) return next();
 
     // Don't intercept if user is in a settings text-input flow
-    if (isInTextInputFlow(ctx.chat.id)) return;
+    if (isInTextInputFlow(ctx.chat.id)) return next();
 
     const chatId = ctx.chat.id;
     const result = await validateAndCreateSession(text, config, chatId);

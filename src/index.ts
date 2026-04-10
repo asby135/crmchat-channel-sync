@@ -16,7 +16,7 @@ const config = new ConfigStore();
 async function main() {
   await config.load();
 
-  // Register handlers, passing config as dependency
+  // Register handlers
   registerStartHandler(bot, config);
   registerSyncHandler(bot, config);
   registerSettingsHandler(bot, config);

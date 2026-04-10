@@ -377,10 +377,10 @@ export function registerSettingsHandler(
   });
 
   // Text input handler for text-type properties (join and leave values)
-  bot.on("text", async (ctx) => {
+  bot.on("text", async (ctx, next) => {
     const chatId = ctx.chat.id;
     const state = textInputStates.get(chatId);
-    if (!state) return; // not in text input flow
+    if (!state) return next(); // not in text input flow, pass to next handler
 
     const text = ctx.message.text.trim();
     if (!text) return;
