@@ -121,6 +121,20 @@ export async function bulkSync(options: {
     total: 0,
   };
 
+  // 0. FETCH REQUIRED PROPERTIES: so we can set defaults on new contacts
+  const properties = await client.listProperties(workspaceId);
+  const requiredCustomDefaults: Record<string, string> = {};
+  for (const prop of properties) {
+    if (prop.required && prop.key.startsWith("custom.")) {
+      const shortKey = prop.key.replace(/^custom\./, "");
+      // Use first option for select types, empty string for text
+      const defaultVal = prop.options?.[0]?.value ?? "";
+      if (defaultVal) {
+        requiredCustomDefaults[shortKey] = defaultVal;
+      }
+    }
+  }
+
   // 1. BATCH DEDUP: fetch all existing contacts, build Set of telegram IDs
   const existingContacts = await client.listContacts(workspaceId);
   const existingTelegramIds = new Set<number>();
@@ -203,10 +217,13 @@ export async function bulkSync(options: {
       },
     };
 
-    // Apply property mapping if configured
-    if (propertyMapping) {
-      const key = propertyMapping.propertyKey.replace(/^custom\./, "");
-      input.custom = { [key]: propertyMapping.joinValue };
+    // Set required custom property defaults + property mapping
+    if (Object.keys(requiredCustomDefaults).length > 0 || propertyMapping) {
+      input.custom = { ...requiredCustomDefaults };
+      if (propertyMapping) {
+        const key = propertyMapping.propertyKey.replace(/^custom\./, "");
+        input.custom[key] = propertyMapping.joinValue;
+      }
     }
 
     try {

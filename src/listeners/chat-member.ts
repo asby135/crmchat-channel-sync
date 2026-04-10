@@ -111,7 +111,17 @@ async function handleJoin(
     return;
   }
 
-  // Create new contact
+  // Create new contact — fetch required properties for defaults
+  const properties = await client.listProperties(workspaceId);
+  const customDefaults: Record<string, string> = {};
+  for (const prop of properties) {
+    if (prop.required && prop.key.startsWith("custom.")) {
+      const shortKey = prop.key.replace(/^custom\./, "");
+      const defaultVal = prop.options?.[0]?.value ?? "";
+      if (defaultVal) customDefaults[shortKey] = defaultVal;
+    }
+  }
+
   const fullName = buildFullName(user.first_name, user.last_name, user.id);
   const input: CreateContactInput = {
     fullName,
@@ -121,9 +131,12 @@ async function handleJoin(
     },
   };
 
-  if (propertyMapping) {
-    const key = propertyMapping.propertyKey.replace(/^custom\./, "");
-    input.custom = { [key]: propertyMapping.joinValue };
+  if (Object.keys(customDefaults).length > 0 || propertyMapping) {
+    input.custom = { ...customDefaults };
+    if (propertyMapping) {
+      const key = propertyMapping.propertyKey.replace(/^custom\./, "");
+      input.custom[key] = propertyMapping.joinValue;
+    }
   }
 
   await sleep(100);
