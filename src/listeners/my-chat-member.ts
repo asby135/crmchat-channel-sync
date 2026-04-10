@@ -258,7 +258,7 @@ export function registerMyChatMemberListener(
 
     await ctx.answerCbQuery();
 
-    // Show progress message and directly trigger sync
+    // Show progress message and run sync in background (avoid Telegraf timeout)
     const progressMsg = await ctx.editMessageText(
       `Syncing ${channelTitle}...\n0/? subscribers`,
     );
@@ -282,6 +282,8 @@ export function registerMyChatMemberListener(
       }
     };
 
+    // Run sync in background to avoid Telegraf 90s callback timeout
+    void (async () => {
     try {
       const result = await bulkSync({
         client,
@@ -334,6 +336,7 @@ export function registerMyChatMemberListener(
         }
       }
     }
+    })(); // end background sync IIFE
   });
 
   bot.action(/^settings_first:(-?\d+)$/, async (ctx) => {

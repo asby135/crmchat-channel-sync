@@ -24,7 +24,14 @@ async function main() {
   registerChatMemberListener(bot, config);
 
   console.log("Channel Parser Bot starting...");
-  await bot.launch();
+  await bot.launch({
+    allowedUpdates: [
+      "message",
+      "callback_query",
+      "my_chat_member",
+      "chat_member",
+    ],
+  });
 
   process.once("SIGINT", () => bot.stop("SIGINT"));
   process.once("SIGTERM", () => bot.stop("SIGTERM"));
