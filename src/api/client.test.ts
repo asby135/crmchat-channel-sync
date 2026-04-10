@@ -170,7 +170,7 @@ describe("CrmChatClient", () => {
   });
 
   describe("callTelegramRaw", () => {
-    it("sends method and params in request body", async () => {
+    it("sends method in URL path and params in request body", async () => {
       fetchSpy.mockResolvedValueOnce(
         jsonResponse({ result: { users: [] } }),
       );
@@ -180,9 +180,9 @@ describe("CrmChatClient", () => {
       });
 
       expect(result).toEqual({ users: [] });
-      const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain("/telegram-accounts/acc1/call/contacts.search");
       expect(JSON.parse(init.body as string)).toEqual({
-        method: "contacts.search",
         params: { q: "test" },
       });
     });
