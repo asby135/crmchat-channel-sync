@@ -3,6 +3,7 @@ import { CrmChatClient } from "../api/client.js";
 import type { Property } from "../api/types.js";
 import type { ConfigStore } from "../config/store.js";
 import type { ChannelConfig, PropertyMapping } from "../config/types.js";
+import { t, type Locale } from "../i18n/index.js";
 
 // ── Callback data cache (Telegram 64-byte limit workaround) ────────
 
@@ -43,27 +44,29 @@ export function isInTextInputFlow(chatId: number): boolean {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-function formatChannelSettings(ch: ChannelConfig): string {
+function formatChannelSettings(ch: ChannelConfig, l: Locale): string {
   const m = ch.propertyMapping;
   const lines = [
-    `Settings for ${ch.channelTitle}:`,
+    l.settingsForChannel(ch.channelTitle),
     "",
-    `Property: ${m ? m.propertyName : "not set"}`,
-    `On join: ${m?.joinLabel ?? "\u2014"}`,
-    `On leave: ${m?.leaveLabel ?? "\u2014"}`,
-    `Last sync: ${ch.lastSyncAt ?? "never"}`,
-    `Subscribers: ${ch.subscriberCount ?? "unknown"}`,
+    m ? l.settingsProperty(m.propertyName) : l.settingsPropertyNotSet,
+    m?.joinLabel ? l.settingsOnJoin(m.joinLabel) : l.settingsOnJoinNone,
+    m?.leaveLabel ? l.settingsOnLeave(m.leaveLabel) : l.settingsOnLeaveNone,
+    ch.lastSyncAt ? l.settingsLastSync(ch.lastSyncAt) : l.settingsLastSyncNever,
+    ch.subscriberCount != null
+      ? l.settingsSubscribers(String(ch.subscriberCount))
+      : l.settingsSubscribersUnknown,
   ];
   return lines.join("\n");
 }
 
-function channelSettingsKeyboard(channelId: number) {
+function channelSettingsKeyboard(channelId: number, l: Locale) {
   return Markup.inlineKeyboard([
     [
-      Markup.button.callback("Set property mapping", `set_mapping:${channelId}`),
-      Markup.button.callback("Remove mapping", `remove_mapping:${channelId}`),
+      Markup.button.callback(l.settingsBtnSetMapping, `set_mapping:${channelId}`),
+      Markup.button.callback(l.settingsBtnRemoveMapping, `remove_mapping:${channelId}`),
     ],
-    [Markup.button.callback("Back", "settings_back")],
+    [Markup.button.callback(l.settingsBtnBack, "settings_back")],
   ]);
 }
 
@@ -81,20 +84,18 @@ export function registerSettingsHandler(
   // /settings command: list tracked channels
   bot.command("settings", async (ctx) => {
     const chatId = ctx.chat.id;
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
     const session = config.getSession(chatId);
 
     if (!session) {
-      await ctx.reply(
-        "You need to connect first. Send /start to set up your CRMChat API key.",
-      );
+      await ctx.reply(l.settingsNeedConnect);
       return;
     }
 
     const channels = config.getChannelsByWorkspace(session.workspaceId);
     if (channels.length === 0) {
-      await ctx.reply(
-        "No channels configured yet. Add me as admin to a channel or group first.",
-      );
+      await ctx.reply(l.settingsNoChannels);
       return;
     }
 
@@ -105,7 +106,7 @@ export function registerSettingsHandler(
       ),
     );
 
-    await ctx.reply("Choose a channel to configure:", {
+    await ctx.reply(l.settingsChooseChannel, {
       ...Markup.inlineKeyboard(buttons, { columns: 2 }),
     });
   });
@@ -113,16 +114,18 @@ export function registerSettingsHandler(
   // Step 3: user picks a channel -> show settings
   bot.action(/^settings_channel:(-?\d+)$/, async (ctx) => {
     const channelId = Number(ctx.match[1]);
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
     await ctx.answerCbQuery();
 
     const ch = config.getChannelConfig(channelId);
     if (!ch) {
-      await ctx.editMessageText("Channel not found. Try /settings again.");
+      await ctx.editMessageText(l.settingsChannelNotFound);
       return;
     }
 
-    await ctx.editMessageText(formatChannelSettings(ch), {
-      ...channelSettingsKeyboard(channelId),
+    await ctx.editMessageText(formatChannelSettings(ch, l), {
+      ...channelSettingsKeyboard(channelId, l),
     });
   });
 
@@ -130,17 +133,19 @@ export function registerSettingsHandler(
   bot.action("settings_back", async (ctx) => {
     const chatId = ctx.chat?.id;
     if (!chatId) return;
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
     await ctx.answerCbQuery();
 
     const session = config.getSession(chatId);
     if (!session) {
-      await ctx.editMessageText("Session expired. Send /start to reconnect.");
+      await ctx.editMessageText(l.settingsSessionExpired);
       return;
     }
 
     const channels = config.getChannelsByWorkspace(session.workspaceId);
     if (channels.length === 0) {
-      await ctx.editMessageText("No channels configured.");
+      await ctx.editMessageText(l.settingsNoChannelsConfigured);
       return;
     }
 
@@ -151,7 +156,7 @@ export function registerSettingsHandler(
       ),
     );
 
-    await ctx.editMessageText("Choose a channel to configure:", {
+    await ctx.editMessageText(l.settingsChooseChannel, {
       ...Markup.inlineKeyboard(buttons, { columns: 2 }),
     });
   });
@@ -159,30 +164,34 @@ export function registerSettingsHandler(
   // "Remove mapping" -> clear property mapping
   bot.action(/^remove_mapping:(-?\d+)$/, async (ctx) => {
     const channelId = Number(ctx.match[1]);
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
     await ctx.answerCbQuery();
 
     const ch = config.getChannelConfig(channelId);
     if (!ch) {
-      await ctx.editMessageText("Channel not found. Try /settings again.");
+      await ctx.editMessageText(l.settingsChannelNotFound);
       return;
     }
 
     const updated: ChannelConfig = { ...ch, propertyMapping: undefined };
     config.setChannelConfig(channelId, updated);
 
-    await ctx.editMessageText(formatChannelSettings(updated), {
-      ...channelSettingsKeyboard(channelId),
+    await ctx.editMessageText(formatChannelSettings(updated, l), {
+      ...channelSettingsKeyboard(channelId, l),
     });
   });
 
   // "Set property mapping" -> fetch properties from CRM API
   bot.action(/^set_mapping:(-?\d+)$/, async (ctx) => {
     const channelId = Number(ctx.match[1]);
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
     await ctx.answerCbQuery();
 
     const ch = config.getChannelConfig(channelId);
     if (!ch) {
-      await ctx.editMessageText("Channel not found. Try /settings again.");
+      await ctx.editMessageText(l.settingsChannelNotFound);
       return;
     }
 
@@ -192,8 +201,8 @@ export function registerSettingsHandler(
       properties = await client.listProperties(ch.workspaceId);
     } catch {
       await ctx.editMessageText(
-        "Could not load properties. Try again later.",
-        { ...channelSettingsKeyboard(channelId) },
+        l.settingsCouldNotLoadProps,
+        { ...channelSettingsKeyboard(channelId, l) },
       );
       return;
     }
@@ -201,8 +210,8 @@ export function registerSettingsHandler(
     const configurable = properties.filter(isConfigurableProperty);
     if (configurable.length === 0) {
       await ctx.editMessageText(
-        "No configurable properties found. Create a custom single-select or text property in CRMChat first.",
-        { ...channelSettingsKeyboard(channelId) },
+        l.settingsNoConfigurableProps,
+        { ...channelSettingsKeyboard(channelId, l) },
       );
       return;
     }
@@ -214,11 +223,11 @@ export function registerSettingsHandler(
       ),
     );
     buttons.push(
-      Markup.button.callback("Cancel", `settings_channel:${channelId}`),
+      Markup.button.callback(l.settingsBtnCancel, `settings_channel:${channelId}`),
     );
 
     await ctx.editMessageText(
-      "Select the property to use for join/leave tracking:",
+      l.settingsSelectProperty,
       { ...Markup.inlineKeyboard(buttons, { columns: 2 }) },
     );
   });
@@ -227,11 +236,13 @@ export function registerSettingsHandler(
   bot.action(/^select_prop:(-?\d+):(.+)$/, async (ctx) => {
     const channelId = Number(ctx.match[1]);
     const propKey = ctx.match[2];
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
     await ctx.answerCbQuery();
 
     const ch = config.getChannelConfig(channelId);
     if (!ch) {
-      await ctx.editMessageText("Channel not found. Try /settings again.");
+      await ctx.editMessageText(l.settingsChannelNotFound);
       return;
     }
 
@@ -242,15 +253,15 @@ export function registerSettingsHandler(
       properties = await client.listProperties(ch.workspaceId);
     } catch {
       await ctx.editMessageText(
-        "Could not load properties. Try again later.",
-        { ...channelSettingsKeyboard(channelId) },
+        l.settingsCouldNotLoadProps,
+        { ...channelSettingsKeyboard(channelId, l) },
       );
       return;
     }
 
     const prop = properties.find((p) => p.key === propKey);
     if (!prop) {
-      await ctx.editMessageText("Property not found. Try again.");
+      await ctx.editMessageText(l.settingsPropertyNotFound);
       return;
     }
 
@@ -267,11 +278,11 @@ export function registerSettingsHandler(
         return Markup.button.callback(opt.label, cbKey);
       });
       buttons.push(
-        Markup.button.callback("Cancel", `settings_channel:${channelId}`),
+        Markup.button.callback(l.settingsBtnCancel, `settings_channel:${channelId}`),
       );
 
       await ctx.editMessageText(
-        "What value when someone JOINS?",
+        l.settingsJoinValuePrompt,
         { ...Markup.inlineKeyboard(buttons, { columns: 2 }) },
       );
     } else {
@@ -286,17 +297,17 @@ export function registerSettingsHandler(
         propName: prop.name,
       });
 
-      await ctx.editMessageText(
-        "Type the value to set when someone JOINS this channel:",
-      );
+      await ctx.editMessageText(l.settingsJoinTextPrompt);
     }
   });
 
   // Single-select: user picks join value -> ask for leave value (cached callback)
   bot.action(/^jv:\d+$/, async (ctx) => {
     const data = lookupCallback(ctx.match[0]);
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
     if (!data) {
-      await ctx.answerCbQuery("Session expired. Try /settings again.");
+      await ctx.answerCbQuery(l.settingsSessionExpiredCb);
       return;
     }
 
@@ -309,7 +320,7 @@ export function registerSettingsHandler(
 
     const ch = config.getChannelConfig(channelId);
     if (!ch) {
-      await ctx.editMessageText("Channel not found. Try /settings again.");
+      await ctx.editMessageText(l.settingsChannelNotFound);
       return;
     }
 
@@ -320,15 +331,15 @@ export function registerSettingsHandler(
       properties = await client.listProperties(ch.workspaceId);
     } catch {
       await ctx.editMessageText(
-        "Could not load properties. Try again later.",
-        { ...channelSettingsKeyboard(channelId) },
+        l.settingsCouldNotLoadProps,
+        { ...channelSettingsKeyboard(channelId, l) },
       );
       return;
     }
 
     const prop = properties.find((p) => p.key === propKey);
     if (!prop || !prop.options) {
-      await ctx.editMessageText("Property not found. Try again.");
+      await ctx.editMessageText(l.settingsPropertyNotFound);
       return;
     }
 
@@ -345,11 +356,11 @@ export function registerSettingsHandler(
       return Markup.button.callback(opt.label, cbKey);
     });
     buttons.push(
-      Markup.button.callback("Cancel", `settings_channel:${channelId}`),
+      Markup.button.callback(l.settingsBtnCancel, `settings_channel:${channelId}`),
     );
 
     await ctx.editMessageText(
-      "What value when someone LEAVES?",
+      l.settingsLeaveValuePrompt,
       { ...Markup.inlineKeyboard(buttons, { columns: 2 }) },
     );
   });
@@ -357,8 +368,10 @@ export function registerSettingsHandler(
   // Single-select: user picks leave value -> save mapping (cached callback)
   bot.action(/^lv:\d+$/, async (ctx) => {
     const data = lookupCallback(ctx.match[0]);
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
     if (!data) {
-      await ctx.answerCbQuery("Session expired. Try /settings again.");
+      await ctx.answerCbQuery(l.settingsSessionExpiredCb);
       return;
     }
 
@@ -373,7 +386,7 @@ export function registerSettingsHandler(
 
     const ch = config.getChannelConfig(channelId);
     if (!ch) {
-      await ctx.editMessageText("Channel not found. Try /settings again.");
+      await ctx.editMessageText(l.settingsChannelNotFound);
       return;
     }
 
@@ -389,8 +402,8 @@ export function registerSettingsHandler(
     config.setChannelConfig(channelId, { ...ch, propertyMapping: mapping });
 
     await ctx.editMessageText(
-      `Property mapping saved!\n${propName}: ${joinLabel} (join) / ${leaveLabel} (leave)`,
-      { ...channelSettingsKeyboard(channelId) },
+      l.settingsMappingSaved(propName, joinLabel, leaveLabel),
+      { ...channelSettingsKeyboard(channelId, l) },
     );
   });
 
@@ -403,21 +416,22 @@ export function registerSettingsHandler(
     const text = ctx.message.text.trim();
     if (!text) return;
 
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
+
     if (state.phase === "waiting_for_join_value") {
       // Store join value, ask for leave value
       state.joinValue = text;
       state.phase = "waiting_for_leave_value";
       textInputStates.set(chatId, state);
 
-      await ctx.reply(
-        "Type the value to set when someone LEAVES this channel:",
-      );
+      await ctx.reply(l.settingsLeaveTextPrompt);
     } else if (state.phase === "waiting_for_leave_value") {
       // Save the mapping
       const ch = config.getChannelConfig(state.channelId);
       if (!ch) {
         textInputStates.delete(chatId);
-        await ctx.reply("Channel not found. Try /settings again.");
+        await ctx.reply(l.settingsChannelNotFound);
         return;
       }
 
@@ -438,7 +452,7 @@ export function registerSettingsHandler(
       textInputStates.delete(chatId);
 
       await ctx.reply(
-        `Property mapping saved!\n${state.propName}: ${state.joinValue} (join) / ${text} (leave)`,
+        l.settingsMappingSaved(state.propName, state.joinValue!, text),
       );
     }
   });

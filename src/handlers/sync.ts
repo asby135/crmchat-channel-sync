@@ -6,6 +6,7 @@ import type { PropertyMapping } from "../config/types.js";
 import { sleep } from "../lib/rate-limiter.js";
 import { toMtprotoChannelId } from "../lib/telegram.js";
 import { resolveAccountAndAccessHash } from "../lib/resolve-channel.js";
+import { t } from "../i18n/index.js";
 
 // ── Flood / rate-limit retry helpers ─────────────────────────────────
 
@@ -260,20 +261,18 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
   // /sync command: list configured channels for the user to pick
   bot.command("sync", async (ctx) => {
     const chatId = ctx.chat.id;
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
     const session = config.getSession(chatId);
 
     if (!session) {
-      await ctx.reply(
-        "You need to connect first. Send /start to set up your CRMChat API key.",
-      );
+      await ctx.reply(l.syncNeedConnect);
       return;
     }
 
     const channels = config.getChannelsByWorkspace(session.workspaceId);
     if (channels.length === 0) {
-      await ctx.reply(
-        "No channels configured yet. Add me as admin to a channel or group first.",
-      );
+      await ctx.reply(l.syncNoChannels);
       return;
     }
 
@@ -284,7 +283,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
       ),
     );
 
-    await ctx.reply("Pick a channel to sync:", {
+    await ctx.reply(l.syncPickChannel, {
       ...Markup.inlineKeyboard(buttons, { columns: 1 }),
     });
   });
@@ -295,11 +294,14 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
     const chatId = ctx.chat?.id;
     if (!chatId) return;
 
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
+
     await ctx.answerCbQuery();
 
     const channelConfig = config.getChannelConfig(channelId);
     if (!channelConfig) {
-      await ctx.editMessageText("Channel not found in config. Try /sync again.");
+      await ctx.editMessageText(l.syncChannelNotFound);
       return;
     }
 
@@ -325,7 +327,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
         });
       } catch (err) {
         await ctx.editMessageText(
-          `Sync failed for ${channelTitle}. ${err instanceof Error ? err.message : "Unknown error"}`,
+          l.syncFailed(channelTitle, err instanceof Error ? err.message : "Unknown error"),
         );
         return;
       }
@@ -333,7 +335,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
 
     // Send initial progress message
     const progressMsg = await ctx.editMessageText(
-      `Syncing ${channelTitle}...\n0/? subscribers synced ${buildProgressBar(0)}`,
+      l.syncProgress(channelTitle, 0, "?", buildProgressBar(0)),
     );
 
     // Determine message ID for editing
@@ -351,7 +353,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
           chatId,
           msgId,
           undefined,
-          `Syncing ${channelTitle}...\n${synced}/${total} subscribers synced ${bar}`,
+          l.syncProgress(channelTitle, synced, total, bar),
         );
       } catch {
         // Ignore edit errors (message not modified, etc.)
@@ -378,11 +380,11 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
 
       // Final completion message
       const completionText = [
-        `Sync complete for ${channelTitle}!`,
-        `${result.created} new contacts`,
-        `${result.existing} already existed`,
-        `${result.private} private (skipped)`,
-        `${result.failed} failed`,
+        l.syncComplete(channelTitle),
+        l.syncNewContacts(result.created),
+        l.syncExisting(result.existing),
+        l.syncPrivate(result.private),
+        l.syncFailedCount(result.failed),
       ].join("\n");
 
       if (msgId) {
@@ -395,7 +397,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
       }
     } catch (err) {
       console.error(`[sync] Error syncing channel ${channelId}:`, err);
-      const errorText = `Sync failed for ${channelTitle}. ${err instanceof Error ? err.message : "Unknown error"}`;
+      const errorText = l.syncFailed(channelTitle, err instanceof Error ? err.message : "Unknown error");
       if (msgId) {
         try {
           await ctx.telegram.editMessageText(

@@ -2,6 +2,7 @@ import type { Telegraf } from "telegraf";
 import { CrmChatClient, ApiAuthError } from "../api/client.js";
 import type { ConfigStore } from "../config/store.js";
 import { isInTextInputFlow } from "./settings.js";
+import { t } from "../i18n/index.js";
 
 // ── Exported helper (testable without Telegraf context) ──────────────
 
@@ -56,6 +57,19 @@ export async function validateAndCreateSession(
   return { workspaceName: workspace.name };
 }
 
+// ── Localized error mapping ─────────────────────────────────────────
+
+function localizeError(error: string, lang: string | undefined): string {
+  const l = t(lang);
+  const map: Record<string, string> = {
+    "Invalid API key. Check Settings > API Keys in CRMChat.": l.invalidApiKey,
+    "Could not reach CRMChat API. Please try again.": l.apiUnreachable,
+    "No organizations found for this API key.": l.noOrganizations,
+    "No workspaces found for this organization.": l.noWorkspaces,
+  };
+  return map[error] ?? error;
+}
+
 // ── Handler registration ─────────────────────────────────────────────
 
 export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
@@ -63,16 +77,16 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
   bot.start(async (ctx) => {
     const chatId = ctx.chat.id;
     const payload = ctx.startPayload?.trim();
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
 
     // Flow A: deep link with API key
     if (payload && payload.startsWith("sk_")) {
       const result = await validateAndCreateSession(payload, config, chatId);
       if ("workspaceName" in result) {
-        await ctx.reply(
-          `Connected to workspace: ${result.workspaceName}! Now add me as admin to channels you want to sync.`,
-        );
+        await ctx.reply(l.connectedToWorkspace(result.workspaceName));
       } else {
-        await ctx.reply(result.error);
+        await ctx.reply(localizeError(result.error, lang));
       }
       return;
     }
@@ -80,13 +94,9 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
     // Flow B: no deep link
     const session = config.getSession(chatId);
     if (session) {
-      await ctx.reply(
-        `You're connected to workspace: ${session.workspaceId}. Use /sync to sync a channel.`,
-      );
+      await ctx.reply(l.alreadyConnected(session.workspaceId));
     } else {
-      await ctx.reply(
-        "Welcome! Send me your CRMChat API key to get started. Find it in Settings > API Keys.",
-      );
+      await ctx.reply(l.welcome);
     }
   });
 
@@ -99,13 +109,13 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
     if (isInTextInputFlow(ctx.chat.id)) return next();
 
     const chatId = ctx.chat.id;
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
     const result = await validateAndCreateSession(text, config, chatId);
     if ("workspaceName" in result) {
-      await ctx.reply(
-        `Connected to workspace: ${result.workspaceName}! Now add me as admin to channels you want to sync.`,
-      );
+      await ctx.reply(l.connectedToWorkspace(result.workspaceName));
     } else {
-      await ctx.reply(result.error);
+      await ctx.reply(localizeError(result.error, lang));
     }
   });
 }

@@ -3,6 +3,7 @@ import type { ConfigStore } from "../config/store.js";
 import { CrmChatClient } from "../api/client.js";
 import { bulkSync } from "../handlers/sync.js";
 import { resolveAccountAndAccessHash } from "../lib/resolve-channel.js";
+import { t } from "../i18n/index.js";
 
 // ── Exported helper (testable without Telegraf context) ──────────────
 
@@ -44,6 +45,8 @@ export function registerMyChatMemberListener(
 
     const channelId = chat.id;
     const channelTitle = "title" in chat ? chat.title : `Chat ${channelId}`;
+    const lang = from.language_code;
+    const l = t(lang);
 
     if (action === "promoted") {
       // Ignore events where "from" is a bot (including ourselves)
@@ -55,7 +58,7 @@ export function registerMyChatMemberListener(
         try {
           await ctx.telegram.sendMessage(
             from.id,
-            `I've been added to ${channelTitle}! To sync subscribers, first connect your CRMChat account: send /start to me in DM.`,
+            l.promotedNoSession(channelTitle),
           );
         } catch (err) {
           console.log(`[my_chat_member] Could not DM user ${from.id}:`, String(err));
@@ -87,16 +90,16 @@ export function registerMyChatMemberListener(
 
       await ctx.telegram.sendMessage(
         from.id,
-        `I've been added to **${channelTitle}**! Want to sync its subscribers to your CRMChat workspace (${workspaceName})?`,
+        l.promotedWithSession(channelTitle, workspaceName),
         {
           parse_mode: "Markdown",
           ...Markup.inlineKeyboard([
-            Markup.button.callback("\u2705 Sync now", `sync_now:${channelId}`),
+            Markup.button.callback(l.syncNowBtn, `sync_now:${channelId}`),
             Markup.button.callback(
-              "\u2699\ufe0f Settings first",
+              l.settingsFirstBtn,
               `settings_first:${channelId}`,
             ),
-            Markup.button.callback("\u274c Not now", `not_now:${channelId}`),
+            Markup.button.callback(l.notNowBtn, `not_now:${channelId}`),
           ]),
         },
       );
@@ -109,7 +112,7 @@ export function registerMyChatMemberListener(
         try {
           await ctx.telegram.sendMessage(
             from.id,
-            `I've been removed from ${channelTitle}. Sync stopped.`,
+            l.demoted(channelTitle),
           );
         } catch (err) {
           console.log(`[my_chat_member] Could not DM user ${from.id}:`, String(err));
@@ -125,12 +128,13 @@ export function registerMyChatMemberListener(
     const chatId = ctx.chat?.id;
     if (!chatId) return;
 
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
+
     const session = config.getSession(chatId);
     if (!session) {
       await ctx.answerCbQuery();
-      await ctx.editMessageText(
-        "Session expired. Please reconnect with /start first.",
-      );
+      await ctx.editMessageText(l.syncNowSessionExpired);
       return;
     }
 
@@ -149,7 +153,7 @@ export function registerMyChatMemberListener(
     } catch (err) {
       await ctx.answerCbQuery();
       await ctx.editMessageText(
-        `Could not resolve channel. ${err instanceof Error ? err.message : "Unknown error"}`,
+        l.syncNowResolveFailed(err instanceof Error ? err.message : "Unknown error"),
       );
       return;
     }
@@ -178,7 +182,7 @@ export function registerMyChatMemberListener(
 
     // Show progress message and run sync in background (avoid Telegraf timeout)
     const progressMsg = await ctx.editMessageText(
-      `Syncing ${channelTitle}...\n0/? subscribers`,
+      l.syncProgressShort(channelTitle, 0, "?"),
     );
 
     const msgId =
@@ -193,7 +197,7 @@ export function registerMyChatMemberListener(
           chatId,
           msgId,
           undefined,
-          `Syncing ${channelTitle}...\n${synced}/${total} subscribers`,
+          l.syncProgressShort(channelTitle, synced, total),
         );
       } catch {
         // Ignore edit errors (message not modified, etc.)
@@ -223,11 +227,11 @@ export function registerMyChatMemberListener(
       }
 
       const completionText = [
-        `Sync complete for ${channelTitle}!`,
-        `${result.created} new contacts`,
-        `${result.existing} already existed`,
-        `${result.private} private (skipped)`,
-        `${result.failed} failed`,
+        l.syncComplete(channelTitle),
+        l.syncNewContacts(result.created),
+        l.syncExisting(result.existing),
+        l.syncPrivate(result.private),
+        l.syncFailedCount(result.failed),
       ].join("\n");
 
       if (msgId) {
@@ -240,7 +244,7 @@ export function registerMyChatMemberListener(
       }
     } catch (err) {
       console.error(`[sync_now] Error syncing channel ${channelId}:`, err);
-      const errorText = `Sync failed for ${channelTitle}. ${err instanceof Error ? err.message : "Unknown error"}`;
+      const errorText = l.syncFailed(channelTitle, err instanceof Error ? err.message : "Unknown error");
       if (msgId) {
         try {
           await ctx.telegram.editMessageText(
@@ -258,16 +262,16 @@ export function registerMyChatMemberListener(
   });
 
   bot.action(/^settings_first:(-?\d+)$/, async (ctx) => {
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
     await ctx.answerCbQuery();
-    await ctx.editMessageText(
-      "Use /settings to configure property mappings, then come back.",
-    );
+    await ctx.editMessageText(l.settingsFirstMsg);
   });
 
   bot.action(/^not_now:(-?\d+)$/, async (ctx) => {
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
     await ctx.answerCbQuery();
-    await ctx.editMessageText(
-      "No problem! You can sync anytime with /sync.",
-    );
+    await ctx.editMessageText(l.notNowMsg);
   });
 }
