@@ -120,6 +120,8 @@ describe("bulkSync", () => {
     ];
 
     fetchSpy
+      // listProperties (required custom props check)
+      .mockResolvedValueOnce(jsonResponse(singlePage([])))
       // listContacts (paginated, returns empty)
       .mockResolvedValueOnce(jsonResponse(singlePage([])))
       // callTelegramRaw - first page with 3 participants
@@ -157,6 +159,8 @@ describe("bulkSync", () => {
     ];
 
     fetchSpy
+      // listProperties
+      .mockResolvedValueOnce(jsonResponse(singlePage([])))
       // listContacts returns one existing contact (Bob)
       .mockResolvedValueOnce(
         jsonResponse(singlePage([makeContact(200, "Bob B")])),
@@ -191,6 +195,8 @@ describe("bulkSync", () => {
     ];
 
     fetchSpy
+      // listProperties
+      .mockResolvedValueOnce(jsonResponse(singlePage([])))
       .mockResolvedValueOnce(jsonResponse(singlePage([])))
       .mockResolvedValueOnce(jsonResponse(makeParticipantsResponse(users)))
       // createContact for Alice only
@@ -218,6 +224,8 @@ describe("bulkSync", () => {
     ];
 
     fetchSpy
+      // listProperties
+      .mockResolvedValueOnce(jsonResponse(singlePage([])))
       .mockResolvedValueOnce(jsonResponse(singlePage([])))
       .mockResolvedValueOnce(jsonResponse(makeParticipantsResponse(users)))
       // Alice: success
@@ -251,6 +259,8 @@ describe("bulkSync", () => {
 
   it("handles empty channel", async () => {
     fetchSpy
+      // listProperties
+      .mockResolvedValueOnce(jsonResponse(singlePage([])))
       .mockResolvedValueOnce(jsonResponse(singlePage([])))
       .mockResolvedValueOnce(jsonResponse(makeEmptyParticipantsResponse()));
 
@@ -275,6 +285,8 @@ describe("bulkSync", () => {
     ];
 
     fetchSpy
+      // listProperties
+      .mockResolvedValueOnce(jsonResponse(singlePage([])))
       .mockResolvedValueOnce(jsonResponse(singlePage([])))
       .mockResolvedValueOnce(jsonResponse(makeParticipantsResponse(users)))
       .mockResolvedValueOnce(
@@ -305,6 +317,8 @@ describe("bulkSync", () => {
     const users = [{ id: 100, firstName: "Alice" }];
 
     fetchSpy
+      // listProperties
+      .mockResolvedValueOnce(jsonResponse(singlePage([])))
       .mockResolvedValueOnce(jsonResponse(singlePage([])))
       .mockResolvedValueOnce(jsonResponse(makeParticipantsResponse(users)))
       .mockResolvedValueOnce(
@@ -323,8 +337,8 @@ describe("bulkSync", () => {
     });
 
     // Verify the createContact call included custom field
-    // The 3rd fetch call (index 2) is the createContact
-    const createCall = fetchSpy.mock.calls[2];
+    // The 4th fetch call (index 3) is the createContact
+    const createCall = fetchSpy.mock.calls[3];
     const body = JSON.parse(createCall[1].body);
     expect(body.custom).toEqual({ stage: "subscriber" });
   });
