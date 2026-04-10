@@ -1,7 +1,10 @@
 export interface PropertyMapping {
-  propertyKey: string;     // e.g. "custom.stage"
-  joinValue: string;       // value set when user joins channel
-  leaveValue: string;      // value set when user leaves channel
+  propertyKey: string;       // e.g. "custom.stage"
+  propertyName: string;      // human-readable, e.g. "Stage"
+  joinValue: string;         // internal value set when user joins
+  joinLabel: string;         // human-readable, e.g. "Subscriber"
+  leaveValue: string;        // internal value set when user leaves
+  leaveLabel: string;        // human-readable, e.g. "Unsubscribed"
 }
 
 export interface ChannelConfig {

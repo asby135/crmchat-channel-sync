@@ -331,8 +331,11 @@ describe("bulkSync", () => {
       client,
       propertyMapping: {
         propertyKey: "custom.stage",
+        propertyName: "Stage",
         joinValue: "subscriber",
+        joinLabel: "Subscriber",
         leaveValue: "unsubscribed",
+        leaveLabel: "Unsubscribed",
       },
     });
 

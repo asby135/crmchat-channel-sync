@@ -44,13 +44,13 @@ export function isInTextInputFlow(chatId: number): boolean {
 // ── Helpers ─────────────────────────────────────────────────────────
 
 function formatChannelSettings(ch: ChannelConfig): string {
-  const mapping = ch.propertyMapping;
+  const m = ch.propertyMapping;
   const lines = [
     `Settings for ${ch.channelTitle}:`,
     "",
-    `Property mapping: ${mapping ? mapping.propertyKey : "not set"}`,
-    `Join value: ${mapping?.joinValue ?? "\u2014"}`,
-    `Leave value: ${mapping?.leaveValue ?? "\u2014"}`,
+    `Property: ${m ? m.propertyName : "not set"}`,
+    `On join: ${m?.joinLabel ?? "\u2014"}`,
+    `On leave: ${m?.leaveLabel ?? "\u2014"}`,
     `Last sync: ${ch.lastSyncAt ?? "never"}`,
     `Subscribers: ${ch.subscriberCount ?? "unknown"}`,
   ];
@@ -260,7 +260,9 @@ export function registerSettingsHandler(
         const cbKey = storeCallback("jv", {
           channelId: String(channelId),
           propKey,
+          propName: prop.name,
           value: opt.value,
+          label: opt.label,
         });
         return Markup.button.callback(opt.label, cbKey);
       });
@@ -300,7 +302,9 @@ export function registerSettingsHandler(
 
     const channelId = Number(data.channelId);
     const propKey = data.propKey;
+    const propName = data.propName;
     const joinValue = data.value;
+    const joinLabel = data.label;
     await ctx.answerCbQuery();
 
     const ch = config.getChannelConfig(channelId);
@@ -332,8 +336,11 @@ export function registerSettingsHandler(
       const cbKey = storeCallback("lv", {
         channelId: String(channelId),
         propKey,
+        propName: propName ?? prop.name,
         joinValue,
+        joinLabel: joinLabel ?? joinValue,
         leaveValue: opt.value,
+        leaveLabel: opt.label,
       });
       return Markup.button.callback(opt.label, cbKey);
     });
@@ -357,8 +364,11 @@ export function registerSettingsHandler(
 
     const channelId = Number(data.channelId);
     const propKey = data.propKey;
+    const propName = data.propName ?? propKey;
     const joinValue = data.joinValue;
+    const joinLabel = data.joinLabel ?? joinValue;
     const leaveValue = data.leaveValue;
+    const leaveLabel = data.leaveLabel ?? leaveValue;
     await ctx.answerCbQuery();
 
     const ch = config.getChannelConfig(channelId);
@@ -369,14 +379,17 @@ export function registerSettingsHandler(
 
     const mapping: PropertyMapping = {
       propertyKey: propKey,
+      propertyName: propName,
       joinValue,
+      joinLabel,
       leaveValue,
+      leaveLabel,
     };
 
     config.setChannelConfig(channelId, { ...ch, propertyMapping: mapping });
 
     await ctx.editMessageText(
-      `Property mapping saved! Join = ${propKey}: ${joinValue}, Leave = ${propKey}: ${leaveValue}`,
+      `Property mapping saved!\n${propName}: ${joinLabel} (join) / ${leaveLabel} (leave)`,
       { ...channelSettingsKeyboard(channelId) },
     );
   });
@@ -410,8 +423,11 @@ export function registerSettingsHandler(
 
       const mapping: PropertyMapping = {
         propertyKey: state.propKey,
+        propertyName: state.propName,
         joinValue: state.joinValue!,
+        joinLabel: state.joinValue!,    // for text props, value IS the label
         leaveValue: text,
+        leaveLabel: text,
       };
 
       config.setChannelConfig(state.channelId, {
@@ -422,7 +438,7 @@ export function registerSettingsHandler(
       textInputStates.delete(chatId);
 
       await ctx.reply(
-        `Property mapping saved! Join = ${state.propKey}: ${state.joinValue}, Leave = ${state.propKey}: ${text}`,
+        `Property mapping saved!\n${state.propName}: ${state.joinValue} (join) / ${text} (leave)`,
       );
     }
   });
