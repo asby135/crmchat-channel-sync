@@ -8,7 +8,7 @@ export class ConfigStore {
   private _saveChain: Promise<void> = Promise.resolve();
 
   constructor(filePath?: string) {
-    this.filePath = filePath ?? "./data/config.json";
+    this.filePath = filePath ?? process.env.CONFIG_PATH ?? "./data/config.json";
     this.config = { channels: {}, sessions: {} };
   }
 
