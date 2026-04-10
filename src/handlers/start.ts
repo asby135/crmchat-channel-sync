@@ -35,10 +35,13 @@ export async function validateAndCreateSession(
   }
 
   const org = orgs[0];
+  console.log("[start] Using org:", org.id, org.name);
   let workspaces;
   try {
     workspaces = await client.listWorkspaces(org.id);
-  } catch {
+    console.log("[start] Workspaces:", workspaces.length);
+  } catch (err) {
+    console.log("[start] listWorkspaces failed:", String(err));
     return { error: "Could not reach CRMChat API. Please try again." };
   }
 
@@ -47,6 +50,7 @@ export async function validateAndCreateSession(
   }
 
   const workspace = workspaces[0];
+  console.log("[start] Session created for workspace:", workspace.id, workspace.name);
 
   config.setSession(chatId, {
     apiKey,
