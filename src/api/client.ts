@@ -78,7 +78,6 @@ export class CrmChatClient {
     options?: { filter?: Record<string, string | number> },
   ): Promise<Contact[]> {
     const query = new URLSearchParams();
-    query.set("limit", "100");
     if (options?.filter) {
       for (const [k, v] of Object.entries(options.filter)) {
         query.set(`filter[${k}]`, String(v));
@@ -191,7 +190,7 @@ export class CrmChatClient {
     do {
       const sep = basePath.includes("?") ? "&" : "?";
       const path: string = cursor
-        ? `${basePath}${sep}cursor=${encodeURIComponent(cursor)}`
+        ? `${basePath}${sep}startingAfter=${encodeURIComponent(cursor)}`
         : basePath;
 
       const page: PaginatedResponse<T> = await this.request<PaginatedResponse<T>>(path);

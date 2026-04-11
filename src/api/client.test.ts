@@ -131,7 +131,7 @@ describe("CrmChatClient", () => {
       expect(fetchSpy).toHaveBeenCalledTimes(2);
 
       const secondUrl = (fetchSpy.mock.calls[1] as [string])[0];
-      expect(secondUrl).toContain("cursor=cursor_abc");
+      expect(secondUrl).toContain("startingAfter=cursor_abc");
     });
   });
 
