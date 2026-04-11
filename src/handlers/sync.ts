@@ -154,6 +154,12 @@ export async function bulkSync(options: {
     }
   }
 
+  // If we got exactly 100 contacts, pagination likely truncated — dedup set may be incomplete
+  const dedupMayBeIncomplete = existingContacts.length >= 100;
+  if (dedupMayBeIncomplete) {
+    console.warn(`[bulkSync] Dedup set may be incomplete (${existingContacts.length} contacts fetched, API limit is 100). Will verify per-contact before creating.`);
+  }
+
   // 2. FETCH SUBSCRIBERS via MTProto pagination
   console.log(`[bulkSync] Fetching channel participants via MTProto...`);
   const allParticipants: TelegramParticipant[] = [];
@@ -215,7 +221,7 @@ export async function bulkSync(options: {
       continue;
     }
 
-    // Already exists in CRM (check by telegram ID and username)
+    // Already exists in CRM — fast check from batch dedup set
     if (
       existingTelegramIds.has(user.id) ||
       (user.username && existingUsernames.has(user.username.toLowerCase()))
@@ -224,6 +230,26 @@ export async function bulkSync(options: {
       processed++;
       if (onProgress) onProgress(processed, result.total);
       continue;
+    }
+
+    // Batch dedup set may be incomplete (CRM API caps at 100 per page).
+    // Do a targeted lookup to avoid creating duplicates.
+    if (dedupMayBeIncomplete) {
+      try {
+        const matches = await withFloodRetry(() =>
+          client.listContacts(workspaceId, { filter: { "telegram.id": user.id } }),
+        );
+        if (matches.some((c) => c.telegram?.id === user.id)) {
+          result.existing++;
+          existingTelegramIds.add(user.id);
+          processed++;
+          if (onProgress) onProgress(processed, result.total);
+          continue;
+        }
+      } catch {
+        // Filter might not be supported — fall through to create
+      }
+      await sleep(100);
     }
 
     // Build contact input
