@@ -48,6 +48,8 @@ export const en = {
     `${title} is already synced (${count} subscribers).\n\nNew subscribers sync automatically based on your /settings — no need to re-sync.`,
 
   syncForceButton: "🔄 Force re-sync",
+  syncStopBtn: "⏹ Stop sync",
+  syncStopped: (title: string) => `⏹ Sync stopped for ${title}.`,
 
   // ── settings.ts ───────────────────────────────────────────────────
   settingsNeedConnect:
@@ -129,4 +131,7 @@ export const en = {
     "Head to /settings to configure custom properties, then come back to sync.",
 
   notNowMsg: "No problem! You can sync anytime with /sync.",
+
+  switchWorkspaceBtn: "🔄 Connect another workspace",
+  switchWorkspaceMsg: "Previous workspace disconnected.\n\nSend me a new API key to connect a different workspace.",
 };

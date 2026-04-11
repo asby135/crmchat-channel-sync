@@ -8,6 +8,10 @@ import { toMtprotoChannelId } from "../lib/telegram.js";
 import { resolveAccountAndAccessHash } from "../lib/resolve-channel.js";
 import { t } from "../i18n/index.js";
 
+// ── Active sync abort controllers ────────────────────────────────────
+
+const activeSyncs = new Map<string, AbortController>();
+
 // ── Flood / rate-limit retry helpers ─────────────────────────────────
 
 const MAX_RETRIES = 3;
@@ -104,6 +108,7 @@ export async function bulkSync(options: {
   accessHash: string;
   propertyMapping?: PropertyMapping;
   onProgress?: (synced: number, total: number) => void;
+  signal?: AbortSignal;
 }): Promise<SyncResult> {
   const {
     client,
@@ -111,6 +116,7 @@ export async function bulkSync(options: {
     accountId,
     channelId,
     accessHash,
+    signal,
     propertyMapping,
     onProgress,
   } = options;
@@ -205,6 +211,11 @@ export async function bulkSync(options: {
   let processed = 0;
 
   for (const participant of allParticipants) {
+    if (signal?.aborted) {
+      console.log(`[bulkSync] Aborted by user at ${processed}/${result.total}`);
+      break;
+    }
+
     const user = userMap.get(participant.userId);
 
     // No user data or deleted user -> private
@@ -357,9 +368,18 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
       }
     }
 
-    // Send initial progress message
+    // Abort controller for stop button
+    const abortController = new AbortController();
+    const stopKey = `stop_sync:${channelId}`;
+    activeSyncs.set(stopKey, abortController);
+
+    // Send initial progress message with stop button
+    const stopBtn = Markup.inlineKeyboard([
+      Markup.button.callback(l.syncStopBtn, stopKey),
+    ]);
     const progressMsg = await ctx.editMessageText(
       l.syncProgress(channelTitle, 0, "?", buildProgressBar(0)),
+      stopBtn,
     );
 
     // Determine message ID for editing
@@ -383,6 +403,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
           msgId,
           undefined,
           l.syncProgress(channelTitle, synced, total, bar),
+          stopBtn,
         );
       } catch {
         // Ignore edit errors (message not modified, etc.)
@@ -398,6 +419,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
         accountId,
         channelId: channelConfig.channelId,
         accessHash,
+        signal: abortController.signal,
         propertyMapping: channelConfig.propertyMapping,
         onProgress,
       });
@@ -409,9 +431,12 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
         subscriberCount: result.total,
       });
 
+      activeSyncs.delete(stopKey);
+
       // Final completion message
+      const wasStopped = abortController.signal.aborted;
       const completionText = [
-        l.syncComplete(channelTitle),
+        wasStopped ? l.syncStopped(channelTitle) : l.syncComplete(channelTitle),
         l.syncNewContacts(result.created),
         l.syncExisting(result.existing),
         l.syncPrivate(result.private),
@@ -428,6 +453,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
         );
       }
     } catch (err) {
+      activeSyncs.delete(stopKey);
       console.error(`[sync] Error syncing channel ${channelId}:`, err);
       const errorText = l.syncFailed(channelTitle, err instanceof Error ? err.message : "Unknown error");
       if (msgId) {
@@ -444,5 +470,16 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
       }
     }
     })(); // end background sync IIFE
+  });
+
+  // Stop sync callback
+  bot.action(/^stop_sync:(-?\d+)$/, async (ctx) => {
+    const key = ctx.match[0];
+    const controller = activeSyncs.get(key);
+    if (controller) {
+      controller.abort();
+      activeSyncs.delete(key);
+    }
+    await ctx.answerCbQuery();
   });
 }

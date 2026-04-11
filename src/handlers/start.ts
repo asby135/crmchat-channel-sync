@@ -1,4 +1,4 @@
-import type { Telegraf } from "telegraf";
+import { Markup, type Telegraf } from "telegraf";
 import { CrmChatClient, ApiAuthError } from "../api/client.js";
 import type { ConfigStore } from "../config/store.js";
 import { isInTextInputFlow } from "./settings.js";
@@ -94,10 +94,26 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
     // Flow B: no deep link
     const session = config.getSession(chatId);
     if (session) {
-      await ctx.reply(l.alreadyConnected(session.workspaceId));
+      await ctx.reply(l.alreadyConnected(session.workspaceId), {
+        ...Markup.inlineKeyboard([
+          Markup.button.callback(l.switchWorkspaceBtn, "switch_workspace"),
+        ]),
+      });
     } else {
       await ctx.reply(l.welcome);
     }
+  });
+
+  // Switch workspace callback
+  bot.action("switch_workspace", async (ctx) => {
+    const chatId = ctx.chat?.id;
+    if (!chatId) return;
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
+
+    await ctx.answerCbQuery();
+    config.removeSession(chatId);
+    await ctx.editMessageText(l.switchWorkspaceMsg);
   });
 
   // Text handler: capture API key input (must call next() for non-matching messages)

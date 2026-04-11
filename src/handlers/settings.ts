@@ -44,6 +44,18 @@ export function isInTextInputFlow(chatId: number): boolean {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
+export function formatTimeAgo(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 function formatChannelSettings(ch: ChannelConfig, l: Locale): string {
   const m = ch.propertyMapping;
   const lines = [
@@ -52,7 +64,7 @@ function formatChannelSettings(ch: ChannelConfig, l: Locale): string {
     m ? l.settingsProperty(m.propertyName) : l.settingsPropertyNotSet,
     m?.joinLabel ? l.settingsOnJoin(m.joinLabel) : l.settingsOnJoinNone,
     m?.leaveLabel ? l.settingsOnLeave(m.leaveLabel) : l.settingsOnLeaveNone,
-    ch.lastSyncAt ? l.settingsLastSync(ch.lastSyncAt) : l.settingsLastSyncNever,
+    ch.lastSyncAt ? l.settingsLastSync(formatTimeAgo(ch.lastSyncAt)) : l.settingsLastSyncNever,
     ch.subscriberCount != null
       ? l.settingsSubscribers(String(ch.subscriberCount))
       : l.settingsSubscribersUnknown,
