@@ -1,16 +1,19 @@
 import { Markup, type Telegraf } from "telegraf";
 import { CrmChatClient, ApiAuthError } from "../api/client.js";
+import type { Workspace } from "../api/types.js";
 import type { ConfigStore } from "../config/store.js";
 import { isInTextInputFlow } from "./settings.js";
 import { t } from "../i18n/index.js";
 
+// ── Pending API key cache (for workspace picker flow) ───────────────
+
+const pendingApiKeys = new Map<number, string>();
+
 // ── Exported helper (testable without Telegraf context) ──────────────
 
-export async function validateAndCreateSession(
+export async function validateApiKey(
   apiKey: string,
-  config: ConfigStore,
-  chatId: number,
-): Promise<{ workspaceName: string } | { error: string }> {
+): Promise<{ workspaces: Workspace[]; organizationId: string } | { error: string }> {
   let client: CrmChatClient;
   try {
     client = new CrmChatClient(apiKey);
@@ -36,7 +39,7 @@ export async function validateAndCreateSession(
   let workspaces;
   try {
     workspaces = await client.listWorkspaces(org.id);
-  } catch (err) {
+  } catch {
     return { error: "Could not reach CRMChat API. Please try again." };
   }
 
@@ -44,16 +47,37 @@ export async function validateAndCreateSession(
     return { error: "No workspaces found for this organization." };
   }
 
-  const workspace = workspaces[0];
-  console.log("[start] Session created for workspace:", workspace.name);
+  return { workspaces, organizationId: org.id };
+}
 
+/** Create session for a specific workspace (used after picker or single-workspace auto-select) */
+export function createSession(
+  config: ConfigStore,
+  chatId: number,
+  apiKey: string,
+  workspace: Workspace,
+  organizationId: string,
+): void {
   config.setSession(chatId, {
     apiKey,
     workspaceId: workspace.id,
-    organizationId: org.id,
+    organizationId,
     authenticatedAt: new Date().toISOString(),
   });
+  console.log("[start] Session created for workspace:", workspace.name);
+}
 
+// Keep backward compat for tests
+export async function validateAndCreateSession(
+  apiKey: string,
+  config: ConfigStore,
+  chatId: number,
+): Promise<{ workspaceName: string } | { error: string }> {
+  const result = await validateApiKey(apiKey);
+  if ("error" in result) return result;
+
+  const workspace = result.workspaces[0];
+  createSession(config, chatId, apiKey, workspace, result.organizationId);
   return { workspaceName: workspace.name };
 }
 
@@ -73,6 +97,40 @@ function localizeError(error: string, lang: string | undefined): string {
 // ── Handler registration ─────────────────────────────────────────────
 
 export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
+
+  /** Shared logic for handling an API key (deep link or text input) */
+  async function handleApiKey(
+    apiKey: string,
+    chatId: number,
+    lang: string | undefined,
+    reply: (text: string, extra?: object) => Promise<unknown>,
+  ) {
+    const l = t(lang);
+    const result = await validateApiKey(apiKey);
+
+    if ("error" in result) {
+      await reply(localizeError(result.error, lang));
+      return;
+    }
+
+    // Single workspace: auto-connect
+    if (result.workspaces.length === 1) {
+      const ws = result.workspaces[0];
+      createSession(config, chatId, apiKey, ws, result.organizationId);
+      await reply(l.connectedToWorkspace(ws.name));
+      return;
+    }
+
+    // Multiple workspaces: show picker
+    pendingApiKeys.set(chatId, apiKey);
+    const buttons = result.workspaces.map((ws) =>
+      Markup.button.callback(ws.name, `pick_ws:${ws.id}:${result.organizationId}`),
+    );
+    await reply(l.pickWorkspace, {
+      ...Markup.inlineKeyboard(buttons, { columns: 1 }),
+    });
+  }
+
   // /start command (with or without deep-link payload)
   bot.start(async (ctx) => {
     const chatId = ctx.chat.id;
@@ -82,12 +140,7 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
 
     // Flow A: deep link with API key
     if (payload && payload.startsWith("sk_")) {
-      const result = await validateAndCreateSession(payload, config, chatId);
-      if ("workspaceName" in result) {
-        await ctx.reply(l.connectedToWorkspace(result.workspaceName));
-      } else {
-        await ctx.reply(localizeError(result.error, lang));
-      }
+      await handleApiKey(payload, chatId, lang, (text, extra) => ctx.reply(text, extra));
       return;
     }
 
@@ -101,6 +154,42 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
       });
     } else {
       await ctx.reply(l.welcome);
+    }
+  });
+
+  // Workspace picker callback
+  bot.action(/^pick_ws:(.+):(.+)$/, async (ctx) => {
+    const chatId = ctx.chat?.id;
+    if (!chatId) return;
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
+
+    const workspaceId = ctx.match[1];
+    const organizationId = ctx.match[2];
+    const apiKey = pendingApiKeys.get(chatId);
+
+    await ctx.answerCbQuery();
+
+    if (!apiKey) {
+      await ctx.editMessageText(l.settingsSessionExpired);
+      return;
+    }
+
+    pendingApiKeys.delete(chatId);
+
+    // Fetch workspace name
+    try {
+      const client = new CrmChatClient(apiKey);
+      const workspaces = await client.listWorkspaces(organizationId);
+      const ws = workspaces.find((w) => w.id === workspaceId);
+      if (!ws) {
+        await ctx.editMessageText(l.noWorkspaces);
+        return;
+      }
+      createSession(config, chatId, apiKey, ws, organizationId);
+      await ctx.editMessageText(l.connectedToWorkspace(ws.name));
+    } catch {
+      await ctx.editMessageText(l.apiUnreachable);
     }
   });
 
@@ -126,12 +215,6 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
 
     const chatId = ctx.chat.id;
     const lang = ctx.from?.language_code;
-    const l = t(lang);
-    const result = await validateAndCreateSession(text, config, chatId);
-    if ("workspaceName" in result) {
-      await ctx.reply(l.connectedToWorkspace(result.workspaceName));
-    } else {
-      await ctx.reply(localizeError(result.error, lang));
-    }
+    await handleApiKey(text, chatId, lang, (t, extra) => ctx.reply(t, extra));
   });
 }

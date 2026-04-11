@@ -132,6 +132,8 @@ export const en = {
 
   notNowMsg: "No problem! You can sync anytime with /sync.",
 
+  pickWorkspace: "This API key has access to multiple workspaces.\n\nWhich one do you want to connect?",
+
   switchWorkspaceBtn: "🔄 Connect another workspace",
   switchWorkspaceMsg: "Previous workspace disconnected.\n\nSend me a new API key to connect a different workspace.",
 };
