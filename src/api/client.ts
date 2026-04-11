@@ -158,6 +158,7 @@ export class CrmChatClient {
       method: init?.method,
       headers,
       body: init?.body,
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (!res.ok) {
@@ -182,6 +183,8 @@ export class CrmChatClient {
   private async paginateAll<T>(basePath: string): Promise<T[]> {
     const all: T[] = [];
     let cursor: string | null = null;
+    let pages = 0;
+    const MAX_PAGES = 100;
 
     do {
       const sep = basePath.includes("?") ? "&" : "?";
@@ -192,7 +195,19 @@ export class CrmChatClient {
       const page: PaginatedResponse<T> = await this.request<PaginatedResponse<T>>(path);
       all.push(...page.data);
 
-      cursor = page.hasMore ? (page.cursors.next ?? null) : null;
+      const nextCursor = page.hasMore ? (page.cursors.next ?? null) : null;
+
+      if (nextCursor && nextCursor === cursor) {
+        console.error(`[paginateAll] Cursor not advancing for ${basePath}, breaking`);
+        break;
+      }
+
+      cursor = nextCursor;
+      pages++;
+      if (pages >= MAX_PAGES) {
+        console.warn(`[paginateAll] Hit max pages (${MAX_PAGES}) for ${basePath}`);
+        break;
+      }
     } while (cursor);
 
     return all;

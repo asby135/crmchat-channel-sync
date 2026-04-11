@@ -124,7 +124,9 @@ export async function bulkSync(options: {
   };
 
   // 0. FETCH REQUIRED PROPERTIES: so we can set defaults on new contacts
+  console.log(`[bulkSync] Starting sync for channel ${channelId}`);
   const properties = await client.listProperties(workspaceId);
+  console.log(`[bulkSync] Fetched ${properties.length} properties`);
   const requiredCustomDefaults: Record<string, string> = {};
   for (const prop of properties) {
     if (prop.required && prop.key.startsWith("custom.")) {
@@ -138,7 +140,9 @@ export async function bulkSync(options: {
   }
 
   // 1. BATCH DEDUP: fetch all existing contacts, build Set of telegram IDs
+  console.log(`[bulkSync] Fetching existing contacts for dedup...`);
   const existingContacts = await client.listContacts(workspaceId);
+  console.log(`[bulkSync] Found ${existingContacts.length} existing contacts`);
   const existingTelegramIds = new Set<number>();
   for (const contact of existingContacts) {
     if (contact.telegram?.id) {
@@ -147,6 +151,7 @@ export async function bulkSync(options: {
   }
 
   // 2. FETCH SUBSCRIBERS via MTProto pagination
+  console.log(`[bulkSync] Fetching channel participants via MTProto...`);
   const allParticipants: TelegramParticipant[] = [];
   const allUsers: TelegramUser[] = [];
   let offset = 0;
@@ -170,6 +175,8 @@ export async function bulkSync(options: {
 
     const page = raw as ChannelParticipantsResult;
 
+    console.log(`[bulkSync] MTProto page: type=${page._}, participants=${page.participants?.length ?? 0}`);
+
     if (!page.participants || page.participants.length === 0) break;
 
     allParticipants.push(...page.participants);
@@ -188,6 +195,7 @@ export async function bulkSync(options: {
   }
 
   result.total = allParticipants.length;
+  console.log(`[bulkSync] Total participants: ${result.total}, existing dedup set: ${existingTelegramIds.size}`);
 
   // 3. FOR EACH SUBSCRIBER: create or skip
   let processed = 0;
