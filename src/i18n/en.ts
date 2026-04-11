@@ -1,7 +1,7 @@
 export const en = {
   // ── start.ts ──────────────────────────────────────────────────────
   welcome:
-    "Hey! 👋\n\nSend me your CRMChat API key to get started.\n\nFind it in *Settings > API Keys* in @crmchat_crm_bot.",
+    "Hey! 👋\n\nSend me your CRMChat API key to get started.\n\nFind it in *Settings > API Keys* in @crmchat\_crm\_bot.",
 
   connectedToWorkspace: (name: string) =>
     `✅ Connected to ${name}!\n\nNow add me as admin to the channels or groups you want to sync.`,
@@ -9,7 +9,7 @@ export const en = {
   alreadyConnected: (workspaceId: string) =>
     `You're already connected to workspace ${workspaceId}.\n\nUse /sync to sync a channel, or configure custom properties first in /settings.`,
 
-  invalidApiKey: "❌ Invalid API key.\n\nDouble-check in *Settings > API Keys* in @crmchat_crm_bot.",
+  invalidApiKey: "❌ Invalid API key.\n\nDouble-check in *Settings > API Keys* in @crmchat\_crm\_bot.",
   apiUnreachable: "⚠️ Couldn't reach CRMChat API. Please try again in a moment.",
   noOrganizations: "No organizations found for this API key.",
   noWorkspaces: "No workspaces found for this organization.",
@@ -42,7 +42,7 @@ export const en = {
   syncFailedCount: (n: number) => `${n} failed`,
 
   syncCheckCrm:
-    "\nView your contacts in @crmchat_crm_bot.\n\n💡 New subscribers will sync automatically based on your /settings.",
+    "\nView your contacts in @crmchat\_crm\_bot.\n\n💡 New subscribers will sync automatically based on your /settings.",
 
   syncAlreadySynced: (title: string, count: number) =>
     `${title} is already synced (${count} subscribers).\n\nNew subscribers sync automatically based on your /settings — no need to re-sync.`,
@@ -90,7 +90,7 @@ export const en = {
   settingsCouldNotLoadProps: "⚠️ Couldn't load custom properties. Try again later.",
 
   settingsNoConfigurableProps:
-    "No custom properties found.\n\nCreate a single-select or text property first in @crmchat_crm_bot > *Custom Properties*.",
+    "No custom properties found.\n\nCreate a single-select or text property first in @crmchat\_crm\_bot > *Custom Properties*.",
 
   settingsSelectProperty: "Select the property to track for subscribers:",
 
@@ -103,7 +103,7 @@ export const en = {
   settingsLeaveTextPrompt: "Type the value to set when someone LEAVES this channel:",
 
   settingsMappingSaved: (propName: string, joinLabel: string, leaveLabel: string) =>
-    `✅ Property mapping saved!\n\n${propName}:\n  Join → ${joinLabel}\n  Leave → ${leaveLabel}\n\n💡 Set up automated outreach in @crmchat_crm_bot > *Outreach > CRM Leads*.`,
+    `✅ Property mapping saved!\n\n${propName}:\n  Join → ${joinLabel}\n  Leave → ${leaveLabel}\n\n💡 Set up automated outreach in @crmchat\_crm\_bot > *Outreach > CRM Leads*.`,
 
   settingsSessionExpiredCb: "Session expired. Try /settings again.",
 
