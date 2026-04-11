@@ -301,8 +301,8 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
     });
   });
 
-  // sync_channel callback: triggered from /sync picker or sync_now flow
-  bot.action(/^sync_channel:(-?\d+)$/, async (ctx) => {
+  // sync_channel callback: triggered from /sync picker, sync_now, or force re-sync
+  bot.action(/^(?:force_)?sync_channel:(-?\d+)$/, async (ctx) => {
     const channelId = Number(ctx.match[1]);
     const chatId = ctx.chat?.id;
     if (!chatId) return;
@@ -318,9 +318,14 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
       return;
     }
 
-    // Prevent re-sync: channel was already synced, new subscribers sync automatically
-    if (channelConfig.lastSyncAt) {
-      await ctx.editMessageText(l.syncAlreadySynced(channelConfig.channelTitle, channelConfig.subscriberCount ?? 0));
+    // Prevent accidental re-sync: offer force button instead
+    if (channelConfig.lastSyncAt && !ctx.match[0].startsWith("force_sync_channel:")) {
+      await ctx.editMessageText(
+        l.syncAlreadySynced(channelConfig.channelTitle, channelConfig.subscriberCount ?? 0),
+        { ...Markup.inlineKeyboard([
+          Markup.button.callback(l.syncForceButton, `force_sync_channel:${channelId}`),
+        ]) },
+      );
       return;
     }
 
