@@ -318,6 +318,12 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
       return;
     }
 
+    // Prevent re-sync: channel was already synced, new subscribers sync automatically
+    if (channelConfig.lastSyncAt) {
+      await ctx.editMessageText(l.syncAlreadySynced(channelConfig.channelTitle, channelConfig.subscriberCount ?? 0));
+      return;
+    }
+
     const client = new CrmChatClient(channelConfig.apiKey);
     const channelTitle = channelConfig.channelTitle;
 

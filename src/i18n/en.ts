@@ -29,6 +29,8 @@ export const en = {
   syncPrivate: (n: number) => `${n} private (skipped)`,
   syncFailedCount: (n: number) => `${n} failed`,
   syncCheckCrm: "\nCheck your synced contacts in @crmchat_crm_bot.\nNew subscribers will be synced automatically based on your /settings.",
+  syncAlreadySynced: (title: string, count: number) =>
+    `${title} was already synced (${count} subscribers).\n\nNew subscribers are synced automatically based on your /settings. No need to re-sync.`,
 
   // ── settings.ts ───────────────────────────────────────────────────
   settingsNeedConnect:

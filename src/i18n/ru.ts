@@ -31,6 +31,8 @@ export const ru: Locale = {
   syncPrivate: (n: number) => `${n} скрытых (пропущено)`,
   syncFailedCount: (n: number) => `${n} с ошибкой`,
   syncCheckCrm: "\nСинхронизированные контакты можно посмотреть в @crmchat_crm_bot.\nНовые подписчики будут синхронизироваться автоматически согласно настройкам /settings.",
+  syncAlreadySynced: (title: string, count: number) =>
+    `${title} уже был синхронизирован (${count} подписчиков).\n\nНовые подписчики синхронизируются автоматически согласно настройкам /settings. Повторная синхронизация не нужна.`,
 
   // ── settings.ts ───────────────────────────────────────────────────
   settingsNeedConnect:
