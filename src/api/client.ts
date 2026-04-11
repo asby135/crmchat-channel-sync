@@ -78,6 +78,7 @@ export class CrmChatClient {
     options?: { filter?: Record<string, string | number> },
   ): Promise<Contact[]> {
     const query = new URLSearchParams();
+    query.set("limit", "500");
     if (options?.filter) {
       for (const [k, v] of Object.entries(options.filter)) {
         query.set(`filter[${k}]`, String(v));
@@ -198,7 +199,7 @@ export class CrmChatClient {
       const nextCursor = page.hasMore ? (page.cursors.next ?? null) : null;
 
       if (nextCursor && nextCursor === cursor) {
-        console.error(`[paginateAll] Cursor not advancing for ${basePath}, breaking`);
+        console.warn(`[paginateAll] Cursor not advancing for ${basePath}, returning partial result (${all.length} items)`);
         break;
       }
 

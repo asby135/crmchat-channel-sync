@@ -144,9 +144,13 @@ export async function bulkSync(options: {
   const existingContacts = await client.listContacts(workspaceId);
   console.log(`[bulkSync] Found ${existingContacts.length} existing contacts`);
   const existingTelegramIds = new Set<number>();
+  const existingUsernames = new Set<string>();
   for (const contact of existingContacts) {
     if (contact.telegram?.id) {
       existingTelegramIds.add(contact.telegram.id);
+    }
+    if (contact.telegram?.username) {
+      existingUsernames.add(contact.telegram.username.toLowerCase());
     }
   }
 
@@ -211,8 +215,11 @@ export async function bulkSync(options: {
       continue;
     }
 
-    // Already exists in CRM
-    if (existingTelegramIds.has(user.id)) {
+    // Already exists in CRM (check by telegram ID and username)
+    if (
+      existingTelegramIds.has(user.id) ||
+      (user.username && existingUsernames.has(user.username.toLowerCase()))
+    ) {
       result.existing++;
       processed++;
       if (onProgress) onProgress(processed, result.total);
