@@ -78,7 +78,7 @@ export class CrmChatClient {
     options?: { filter?: Record<string, string | number> },
   ): Promise<Contact[]> {
     const query = new URLSearchParams();
-    query.set("limit", "500");
+    query.set("limit", "100");
     if (options?.filter) {
       for (const [k, v] of Object.entries(options.filter)) {
         query.set(`filter[${k}]`, String(v));
@@ -199,7 +199,9 @@ export class CrmChatClient {
       const nextCursor = page.hasMore ? (page.cursors.next ?? null) : null;
 
       if (nextCursor && nextCursor === cursor) {
-        console.warn(`[paginateAll] Cursor not advancing for ${basePath}, returning partial result (${all.length} items)`);
+        console.warn(`[paginateAll] Cursor not advancing for ${basePath}, trying offset fallback`);
+        // Fall back to offset-based pagination
+        await this.paginateByOffset(basePath, all);
         break;
       }
 
@@ -212,5 +214,28 @@ export class CrmChatClient {
     } while (cursor);
 
     return all;
+  }
+
+  /** Offset-based fallback when cursor pagination doesn't advance */
+  private async paginateByOffset<T>(basePath: string, all: T[]): Promise<void> {
+    const MAX_PAGES = 100;
+    let offset = all.length;
+
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const sep = basePath.includes("?") ? "&" : "?";
+      const path = `${basePath}${sep}offset=${offset}`;
+
+      try {
+        const res: PaginatedResponse<T> = await this.request<PaginatedResponse<T>>(path);
+        if (!res.data || res.data.length === 0) break;
+        all.push(...res.data);
+        offset += res.data.length;
+        if (!res.hasMore) break;
+      } catch (err) {
+        // API might not support offset param — stop and use what we have
+        console.warn(`[paginateByOffset] Offset fallback failed at offset=${offset}, using ${all.length} items`);
+        break;
+      }
+    }
   }
 }
