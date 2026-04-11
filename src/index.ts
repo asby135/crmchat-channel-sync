@@ -10,7 +10,18 @@ import { registerChatMemberListener } from "./listeners/chat-member.js";
 const token = process.env.BOT_TOKEN;
 if (!token) throw new Error("BOT_TOKEN required");
 
-const bot = new Telegraf(token);
+const bot = new Telegraf(token, {
+  telegram: { webhookReply: false },
+});
+
+// Default parse_mode for all messages
+bot.use((ctx, next) => {
+  const original = ctx.telegram.sendMessage.bind(ctx.telegram);
+  ctx.telegram.sendMessage = (chatId: number | string, text: string, extra?: object) =>
+    original(chatId, text, { parse_mode: "Markdown", ...extra });
+  return next();
+});
+
 const config = new ConfigStore();
 
 async function main() {

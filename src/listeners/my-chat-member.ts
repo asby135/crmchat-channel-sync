@@ -92,7 +92,6 @@ export function registerMyChatMemberListener(
         from.id,
         l.promotedWithSession(channelTitle, workspaceName),
         {
-          parse_mode: "Markdown",
           ...Markup.inlineKeyboard([
             Markup.button.callback(l.syncNowBtn, `sync_now:${channelId}`),
             Markup.button.callback(
