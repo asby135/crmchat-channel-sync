@@ -186,6 +186,7 @@ export class CrmChatClient {
     let cursor: string | null = null;
     let pages = 0;
     const MAX_PAGES = 100;
+    let prevFirstItem: string | null = null;
 
     do {
       const sep = basePath.includes("?") ? "&" : "?";
@@ -194,18 +195,19 @@ export class CrmChatClient {
         : basePath;
 
       const page: PaginatedResponse<T> = await this.request<PaginatedResponse<T>>(path);
-      all.push(...page.data);
 
-      const nextCursor = page.hasMore ? (page.cursors.next ?? null) : null;
-
-      if (nextCursor && nextCursor === cursor) {
-        console.warn(`[paginateAll] Cursor not advancing for ${basePath}, trying offset fallback`);
-        // Fall back to offset-based pagination
-        await this.paginateByOffset(basePath, all);
+      // Detect repeated pages: if this page starts with the same item as the previous page,
+      // the API is returning the same data regardless of cursor
+      const firstItem = page.data.length > 0 ? JSON.stringify(page.data[0]) : null;
+      if (firstItem && firstItem === prevFirstItem) {
+        console.warn(`[paginateAll] API returning duplicate page for ${basePath}, stopping at ${all.length} items`);
         break;
       }
+      prevFirstItem = firstItem;
 
-      cursor = nextCursor;
+      all.push(...page.data);
+      cursor = page.hasMore ? (page.cursors.next ?? null) : null;
+
       pages++;
       if (pages >= MAX_PAGES) {
         console.warn(`[paginateAll] Hit max pages (${MAX_PAGES}) for ${basePath}`);
@@ -216,26 +218,4 @@ export class CrmChatClient {
     return all;
   }
 
-  /** Offset-based fallback when cursor pagination doesn't advance */
-  private async paginateByOffset<T>(basePath: string, all: T[]): Promise<void> {
-    const MAX_PAGES = 100;
-    let offset = all.length;
-
-    for (let page = 0; page < MAX_PAGES; page++) {
-      const sep = basePath.includes("?") ? "&" : "?";
-      const path = `${basePath}${sep}offset=${offset}`;
-
-      try {
-        const res: PaginatedResponse<T> = await this.request<PaginatedResponse<T>>(path);
-        if (!res.data || res.data.length === 0) break;
-        all.push(...res.data);
-        offset += res.data.length;
-        if (!res.hasMore) break;
-      } catch (err) {
-        // API might not support offset param — stop and use what we have
-        console.warn(`[paginateByOffset] Offset fallback failed at offset=${offset}, using ${all.length} items`);
-        break;
-      }
-    }
-  }
 }
