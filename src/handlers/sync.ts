@@ -430,8 +430,10 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
 
     // Run sync in background to avoid Telegraf 90s callback timeout
     void (async () => {
+    let result: SyncResult | null = null;
+    let syncErr: unknown = null;
     try {
-      const result = await bulkSync({
+      result = await bulkSync({
         client,
         workspaceId: channelConfig.workspaceId,
         accountId,
@@ -448,44 +450,47 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
         lastSyncAt: new Date().toISOString(),
         subscriberCount: result.total,
       });
+    } catch (err) {
+      syncErr = err;
+      console.error(`[sync] Error syncing channel ${channelId}:`, err);
+    }
 
-      activeSyncs.delete(stopKey);
+    activeSyncs.delete(stopKey);
 
-      // Final completion message
-      const wasStopped = abortController.signal.aborted;
-      const completionText = [
-        wasStopped ? l.syncStopped(channelTitle) : l.syncComplete(channelTitle),
-        l.syncNewContacts(result.created),
-        l.syncExisting(result.existing),
-        l.syncPrivate(result.private),
-        l.syncFailedCount(result.failed),
-        l.syncCheckCrm,
-      ].join("\n");
+    // Edit the final message (isolated from sync error handling — a failed
+    // final edit should not be misreported as a sync failure)
+    if (!msgId) return;
 
-      if (msgId) {
+    try {
+      if (result) {
+        const wasStopped = abortController.signal.aborted;
+        const completionText = [
+          wasStopped ? l.syncStopped(channelTitle) : l.syncComplete(channelTitle),
+          l.syncNewContacts(result.created),
+          l.syncExisting(result.existing),
+          l.syncPrivate(result.private),
+          l.syncFailedCount(result.failed),
+          l.syncCheckCrm,
+        ].join("\n");
         await ctx.telegram.editMessageText(
           chatId,
           msgId,
           undefined,
           completionText,
+          { reply_markup: { inline_keyboard: [] } },
+        );
+      } else {
+        const errorText = l.syncFailed(channelTitle, localizeSyncError(syncErr, l));
+        await ctx.telegram.editMessageText(
+          chatId,
+          msgId,
+          undefined,
+          errorText,
+          { reply_markup: { inline_keyboard: [] } },
         );
       }
-    } catch (err) {
-      activeSyncs.delete(stopKey);
-      console.error(`[sync] Error syncing channel ${channelId}:`, err);
-      const errorText = l.syncFailed(channelTitle, localizeSyncError(err, l));
-      if (msgId) {
-        try {
-          await ctx.telegram.editMessageText(
-            chatId,
-            msgId,
-            undefined,
-            errorText,
-          );
-        } catch {
-          // Ignore
-        }
-      }
+    } catch (editErr) {
+      console.error(`[sync] Final edit failed for channel ${channelId}:`, editErr);
     }
     })(); // end background sync IIFE
   });
@@ -501,3 +506,4 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
     await ctx.answerCbQuery();
   });
 }
+
