@@ -1,7 +1,7 @@
 import { Markup, type Telegraf } from "telegraf";
 import type { ConfigStore } from "../config/store.js";
 import { CrmChatClient } from "../api/client.js";
-import { bulkSync } from "../handlers/sync.js";
+import { bulkSync, localizeSyncError } from "../handlers/sync.js";
 import { resolveAccountAndAccessHash } from "../lib/resolve-channel.js";
 import { t } from "../i18n/index.js";
 
@@ -151,9 +151,13 @@ export function registerMyChatMemberListener(
       accessHash = resolved.accessHash;
     } catch (err) {
       await ctx.answerCbQuery();
-      await ctx.editMessageText(
-        l.syncNowResolveFailed(err instanceof Error ? err.message : "Unknown error"),
-      );
+      // Show helpful message for known errors, raw reason for unknown ones
+      const errMsg = err instanceof Error ? err.message : "Unknown error";
+      const text =
+        errMsg === "NO_ACTIVE_TG_ACCOUNT"
+          ? localizeSyncError(err, l)
+          : l.syncNowResolveFailed(errMsg);
+      await ctx.editMessageText(text);
       return;
     }
 

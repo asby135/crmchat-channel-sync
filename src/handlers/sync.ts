@@ -79,7 +79,7 @@ interface ChannelParticipantsResult {
 
 // ── Error localization ───────────────────────────────────────────────
 
-function localizeSyncError(err: unknown, l: ReturnType<typeof t>): string {
+export function localizeSyncError(err: unknown, l: ReturnType<typeof t>): string {
   const msg = err instanceof Error ? err.message : "Unknown error";
   if (msg === "NO_ACTIVE_TG_ACCOUNT") return l.syncErrNoActiveTgAccount;
   return msg;
