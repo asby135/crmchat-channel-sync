@@ -48,6 +48,10 @@ export function registerChatMemberListener(
     if (!channelConfig) return; // channel not tracked
 
     const user = new_chat_member.user;
+
+    // Skip bots
+    if (user.is_bot) return;
+
     const client = new CrmChatClient(channelConfig.apiKey);
     const { workspaceId, propertyMapping } = channelConfig;
 
