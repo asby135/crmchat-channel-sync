@@ -26,7 +26,7 @@ export const en = {
   syncChannelNotFound: "Channel not found. Try /sync again.",
 
   syncFailed: (title: string, reason: string) =>
-    `❌ Sync failed for ${title}.\n\n${reason}\n\n⚠️ Note: the connected Telegram account must be an <b>admin</b> of the channel you want to sync.`,
+    `❌ Sync failed for ${title}.\n\n${reason}`,
 
   syncProgress: (title: string, synced: number | string, total: number | string, bar: string) =>
     `Syncing ${title}...\n${synced}/${total} subscribers synced ${bar}`,
@@ -46,6 +46,9 @@ export const en = {
 
   syncAlreadySynced: (title: string, count: number) =>
     `${title} is already synced (${count} subscribers).\n\nNew subscribers sync automatically based on your /settings — no need to re-sync.`,
+
+  syncErrAdminNote:
+    "⚠️ Note: the connected Telegram account must be an <b>admin</b> of the channel you want to sync.",
 
   syncErrNoActiveTgAccount:
     "No active Telegram account found in your workspace.\n\nTo sync channels, you need at least one Telegram account connected. Open @crmchat_crm_bot &gt; <b>Telegram accounts</b> and connect your personal Telegram. It's free and only takes a minute.\n\n⚠️ Important: the connected account must be an <b>admin</b> of the channels you want to sync (typically your own account if you own the channel).\n\nThen come back and try /sync again.",

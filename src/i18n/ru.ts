@@ -28,7 +28,7 @@ export const ru: Locale = {
   syncChannelNotFound: "Канал не найден. Попробуй /sync ещё раз.",
 
   syncFailed: (title: string, reason: string) =>
-    `❌ Синхронизация ${title} не удалась.\n\n${reason}\n\n⚠️ Примечание: подключённый Telegram-аккаунт должен быть <b>админом</b> синхронизируемого канала.`,
+    `❌ Синхронизация ${title} не удалась.\n\n${reason}`,
 
   syncProgress: (title: string, synced: number | string, total: number | string, bar: string) =>
     `Синхронизация ${title}...\n${synced}/${total} подписчиков синхронизировано ${bar}`,
@@ -48,6 +48,9 @@ export const ru: Locale = {
 
   syncAlreadySynced: (title: string, count: number) =>
     `${title} уже синхронизирован (${count} подписчиков).\n\nНовые подписчики синхронизируются автоматически согласно настройкам /settings — повторная синхронизация не нужна.`,
+
+  syncErrAdminNote:
+    "⚠️ Примечание: подключённый Telegram-аккаунт должен быть <b>админом</b> синхронизируемого канала.",
 
   syncErrNoActiveTgAccount:
     "В твоём рабочем пространстве нет активного Telegram-аккаунта.\n\nДля синхронизации каналов нужен хотя бы один подключённый Telegram-аккаунт. Открой @crmchat_crm_bot &gt; <b>Telegram accounts</b> и подключи свой личный Telegram. Это бесплатно и займёт минуту.\n\n⚠️ Важно: подключённый аккаунт должен быть <b>админом</b> синхронизируемых каналов (обычно это твой личный аккаунт, если канал твой).\n\nПосле этого возвращайся и попробуй /sync ещё раз.",
