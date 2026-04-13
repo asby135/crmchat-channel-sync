@@ -47,6 +47,9 @@ export const en = {
   syncAlreadySynced: (title: string, count: number) =>
     `${title} is already synced (${count} subscribers).\n\nNew subscribers sync automatically based on your /settings — no need to re-sync.`,
 
+  syncErrNoActiveTgAccount:
+    "No active Telegram account found in your workspace.\n\nTo sync channels, you need at least one Telegram account connected. Open @crmchat_crm_bot &gt; <b>Telegram accounts</b> and connect your personal Telegram. It's free and only takes a minute.\n\nThen come back and try /sync again.",
+
   syncForceButton: "🔄 Force re-sync",
   syncStopBtn: "⏹ Stop sync",
   syncStopped: (title: string) => `⏹ Sync stopped for ${title}.`,

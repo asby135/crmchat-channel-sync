@@ -24,7 +24,7 @@ export async function resolveAccountAndAccessHash(
   const accounts = await client.listTelegramAccounts(workspaceId);
   const active = accounts.find((a) => a.status === "active");
   if (!active) {
-    throw new Error("No active Telegram account found in workspace");
+    throw new Error("NO_ACTIVE_TG_ACCOUNT");
   }
 
   const accountId = active.id;

@@ -49,6 +49,9 @@ export const ru: Locale = {
   syncAlreadySynced: (title: string, count: number) =>
     `${title} уже синхронизирован (${count} подписчиков).\n\nНовые подписчики синхронизируются автоматически согласно настройкам /settings — повторная синхронизация не нужна.`,
 
+  syncErrNoActiveTgAccount:
+    "В твоём рабочем пространстве нет активного Telegram-аккаунта.\n\nДля синхронизации каналов нужен хотя бы один подключённый Telegram-аккаунт. Открой @crmchat_crm_bot &gt; <b>Telegram accounts</b> и подключи свой личный Telegram. Это бесплатно и займёт минуту.\n\nПосле этого возвращайся и попробуй /sync ещё раз.",
+
   syncForceButton: "🔄 Синхронизировать заново",
   syncStopBtn: "⏹ Остановить",
   syncStopped: (title: string) => `⏹ Синхронизация ${title} остановлена.`,

@@ -77,6 +77,14 @@ interface ChannelParticipantsResult {
   users: TelegramUser[];
 }
 
+// ── Error localization ───────────────────────────────────────────────
+
+function localizeSyncError(err: unknown, l: ReturnType<typeof t>): string {
+  const msg = err instanceof Error ? err.message : "Unknown error";
+  if (msg === "NO_ACTIVE_TG_ACCOUNT") return l.syncErrNoActiveTgAccount;
+  return msg;
+}
+
 // ── Pure helpers ──────────────────────────────────────────────────────
 
 export function buildFullName(
@@ -362,7 +370,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
         });
       } catch (err) {
         await ctx.editMessageText(
-          l.syncFailed(channelTitle, err instanceof Error ? err.message : "Unknown error"),
+          l.syncFailed(channelTitle, localizeSyncError(err, l)),
         );
         return;
       }
@@ -455,7 +463,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
     } catch (err) {
       activeSyncs.delete(stopKey);
       console.error(`[sync] Error syncing channel ${channelId}:`, err);
-      const errorText = l.syncFailed(channelTitle, err instanceof Error ? err.message : "Unknown error");
+      const errorText = l.syncFailed(channelTitle, localizeSyncError(err, l));
       if (msgId) {
         try {
           await ctx.telegram.editMessageText(
