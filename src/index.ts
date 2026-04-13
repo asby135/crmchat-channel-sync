@@ -14,11 +14,26 @@ const bot = new Telegraf(token, {
   telegram: { webhookReply: false },
 });
 
-// Default parse_mode for all messages
+// Default parse_mode: "HTML" for all outgoing text messages
 bot.use((ctx, next) => {
-  const original = ctx.telegram.sendMessage.bind(ctx.telegram);
-  ctx.telegram.sendMessage = (chatId: number | string, text: string, extra?: object) =>
-    original(chatId, text, { parse_mode: "HTML", ...extra });
+  const tg = ctx.telegram;
+  const origSend = tg.sendMessage.bind(tg);
+  tg.sendMessage = ((chatId: number | string, text: string, extra?: object) =>
+    origSend(chatId, text, { parse_mode: "HTML", ...extra })) as typeof tg.sendMessage;
+
+  const origEdit = tg.editMessageText.bind(tg);
+  tg.editMessageText = ((
+    chatId: number | string | undefined,
+    messageId: number | undefined,
+    inlineMessageId: string | undefined,
+    text: string,
+    extra?: object,
+  ) =>
+    origEdit(chatId, messageId, inlineMessageId, text, {
+      parse_mode: "HTML",
+      ...extra,
+    })) as typeof tg.editMessageText;
+
   return next();
 });
 
