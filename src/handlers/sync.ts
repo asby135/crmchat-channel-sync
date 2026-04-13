@@ -68,6 +68,7 @@ interface TelegramUser {
   lastName?: string;
   username?: string;
   deleted?: boolean;
+  bot?: boolean;
 }
 
 interface ChannelParticipantsResult {
@@ -229,6 +230,14 @@ export async function bulkSync(options: {
 
     // No user data or deleted user -> private
     if (!user || !user.id || user.deleted) {
+      result.private++;
+      processed++;
+      if (onProgress) await onProgress(processed, result.total);
+      continue;
+    }
+
+    // Skip bots (MTProto bot flag, or username ending in "bot")
+    if (user.bot || user.username?.toLowerCase().endsWith("bot")) {
       result.private++;
       processed++;
       if (onProgress) await onProgress(processed, result.total);
