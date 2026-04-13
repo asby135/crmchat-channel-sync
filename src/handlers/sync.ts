@@ -115,7 +115,7 @@ export async function bulkSync(options: {
   channelId: number;
   accessHash: string;
   propertyMapping?: PropertyMapping;
-  onProgress?: (synced: number, total: number) => void;
+  onProgress?: (synced: number, total: number) => void | Promise<void>;
   signal?: AbortSignal;
 }): Promise<SyncResult> {
   const {
@@ -230,7 +230,7 @@ export async function bulkSync(options: {
     if (!user || !user.id || user.deleted) {
       result.private++;
       processed++;
-      if (onProgress) onProgress(processed, result.total);
+      if (onProgress) await onProgress(processed, result.total);
       continue;
     }
 
@@ -241,7 +241,7 @@ export async function bulkSync(options: {
     ) {
       result.existing++;
       processed++;
-      if (onProgress) onProgress(processed, result.total);
+      if (onProgress) await onProgress(processed, result.total);
       continue;
     }
 
