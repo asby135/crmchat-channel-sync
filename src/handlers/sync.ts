@@ -236,8 +236,8 @@ export async function bulkSync(options: {
       continue;
     }
 
-    // Skip bots (MTProto bot flag, or username ending in "bot")
-    if (user.bot || user.username?.toLowerCase().endsWith("bot")) {
+    // Skip bots
+    if (user.bot) {
       result.private++;
       processed++;
       if (onProgress) await onProgress(processed, result.total);
