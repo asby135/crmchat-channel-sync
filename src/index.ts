@@ -18,7 +18,7 @@ const bot = new Telegraf(token, {
 bot.use((ctx, next) => {
   const original = ctx.telegram.sendMessage.bind(ctx.telegram);
   ctx.telegram.sendMessage = (chatId: number | string, text: string, extra?: object) =>
-    original(chatId, text, { parse_mode: "Markdown", ...extra });
+    original(chatId, text, { parse_mode: "HTML", ...extra });
   return next();
 });
 

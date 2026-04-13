@@ -3,7 +3,7 @@ import type { Locale } from "./index.js";
 export const ru: Locale = {
   // ── start.ts ──────────────────────────────────────────────────────
   welcome:
-    "Привет! 👋\n\nОтправь мне API-ключ CRMChat, чтобы начать.\n\nНайти его можно в *Настройки > API-ключи* в @crmchat\\_crm\\_bot.",
+    "Привет! 👋\n\nОтправь мне API-ключ CRMChat, чтобы начать.\n\nНайти его можно в <b>Настройки &gt; API-ключи</b> в @crmchat_crm_bot.",
 
   connectedToWorkspace: (name: string) =>
     `✅ Подключено к ${name}!\n\nТеперь добавь меня админом в каналы или группы, которые хочешь синхронизировать.`,
@@ -11,7 +11,7 @@ export const ru: Locale = {
   alreadyConnected: (workspaceId: string) =>
     `Ты уже подключён к рабочему пространству ${workspaceId}.\n\nИспользуй /sync для синхронизации канала или сначала настрой кастомные поля в /settings.`,
 
-  invalidApiKey: "❌ Неверный API-ключ.\n\nПроверь в *Настройки > API-ключи* в @crmchat\\_crm\\_bot.",
+  invalidApiKey: "❌ Неверный API-ключ.\n\nПроверь в <b>Настройки &gt; API-ключи</b> в @crmchat_crm_bot.",
   apiUnreachable: "⚠️ Не удалось связаться с CRMChat API. Попробуй чуть позже.",
   noOrganizations: "Организации для этого API-ключа не найдены.",
   noWorkspaces: "Рабочие пространства для этой организации не найдены.",
@@ -44,7 +44,7 @@ export const ru: Locale = {
   syncFailedCount: (n: number) => `${n} с ошибкой`,
 
   syncCheckCrm:
-    "\nСмотри контакты в @crmchat\\_crm\\_bot.\n\n💡 Новые подписчики будут синхронизироваться автоматически согласно настройкам /settings.",
+    "\nСмотри контакты в @crmchat_crm_bot.\n\n💡 Новые подписчики будут синхронизироваться автоматически согласно настройкам /settings.",
 
   syncAlreadySynced: (title: string, count: number) =>
     `${title} уже синхронизирован (${count} подписчиков).\n\nНовые подписчики синхронизируются автоматически согласно настройкам /settings — повторная синхронизация не нужна.`,
@@ -92,7 +92,7 @@ export const ru: Locale = {
   settingsCouldNotLoadProps: "⚠️ Не удалось загрузить кастомные поля. Попробуй позже.",
 
   settingsNoConfigurableProps:
-    "Кастомные поля не найдены.\n\nСначала создай поле типа single-select или text в @crmchat\\_crm\\_bot > *Кастомные поля*.",
+    "Кастомные поля не найдены.\n\nСначала создай поле типа single-select или text в @crmchat_crm_bot &gt; <b>Кастомные поля</b>.",
 
   settingsSelectProperty: "Выбери поле для отслеживания подписчиков:",
 
@@ -105,7 +105,7 @@ export const ru: Locale = {
   settingsLeaveTextPrompt: "Введи значение при ВЫХОДЕ из этого канала:",
 
   settingsMappingSaved: (propName: string, joinLabel: string, leaveLabel: string) =>
-    `✅ Настройки сохранены!\n\n${propName}:\n  Вступление → ${joinLabel}\n  Выход → ${leaveLabel}\n\n💡 Настрой автоматические рассылки в @crmchat\\_crm\\_bot > *Рассылки > Лиды из CRM*.`,
+    `✅ Настройки сохранены!\n\n${propName}:\n  Вступление → ${joinLabel}\n  Выход → ${leaveLabel}\n\n💡 Настрой автоматические рассылки в @crmchat_crm_bot &gt; <b>Рассылки &gt; Лиды из CRM</b>.`,
 
   settingsSessionExpiredCb: "Сессия истекла. Попробуй /settings ещё раз.",
 
