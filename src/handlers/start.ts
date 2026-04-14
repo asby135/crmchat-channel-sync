@@ -13,7 +13,7 @@ const pendingApiKeys = new Map<number, string>();
 
 export async function validateApiKey(
   apiKey: string,
-): Promise<{ workspaces: Workspace[]; organizationId: string } | { error: string }> {
+): Promise<{ workspaces: Workspace[] } | { error: string }> {
   let client: CrmChatClient;
   try {
     client = new CrmChatClient(apiKey);
@@ -35,10 +35,13 @@ export async function validateApiKey(
     return { error: "No organizations found for this API key." };
   }
 
-  const org = orgs[0];
-  let workspaces;
+  // Aggregate workspaces across ALL organizations the API key can see.
+  // Picking only orgs[0] hid workspaces in newly-created orgs (bug: bot
+  // silently auto-selected the wrong workspace instead of showing a picker).
+  const workspaces: Workspace[] = [];
   try {
-    workspaces = await client.listWorkspaces(org.id);
+    const perOrg = await Promise.all(orgs.map((o) => client.listWorkspaces(o.id)));
+    for (const list of perOrg) workspaces.push(...list);
   } catch {
     return { error: "Could not reach CRMChat API. Please try again." };
   }
@@ -47,7 +50,7 @@ export async function validateApiKey(
     return { error: "No workspaces found for this organization." };
   }
 
-  return { workspaces, organizationId: org.id };
+  return { workspaces };
 }
 
 /** Create session for a specific workspace (used after picker or single-workspace auto-select) */
@@ -77,7 +80,7 @@ export async function validateAndCreateSession(
   if ("error" in result) return result;
 
   const workspace = result.workspaces[0];
-  createSession(config, chatId, apiKey, workspace, result.organizationId);
+  createSession(config, chatId, apiKey, workspace, workspace.organizationId);
   return { workspaceName: workspace.name };
 }
 
@@ -113,18 +116,13 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
       return;
     }
 
-    // Single workspace: auto-connect
-    if (result.workspaces.length === 1) {
-      const ws = result.workspaces[0];
-      createSession(config, chatId, apiKey, ws, result.organizationId);
-      await reply(l.connectedToWorkspace(ws.name));
-      return;
-    }
-
-    // Multiple workspaces: show picker
+    // Always show the picker with ALL workspaces across every org the API
+    // key can see, even when there's only one. The user asked to confirm
+    // the target workspace explicitly so the bot never silently picks the
+    // wrong one.
     pendingApiKeys.set(chatId, apiKey);
     const buttons = result.workspaces.map((ws) =>
-      Markup.button.callback(ws.name, `pick_ws:${ws.id}:${result.organizationId}`),
+      Markup.button.callback(ws.name, `pick_ws:${ws.id}:${ws.organizationId}`),
     );
     await reply(l.pickWorkspace, {
       ...Markup.inlineKeyboard(buttons, { columns: 1 }),

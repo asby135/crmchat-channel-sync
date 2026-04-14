@@ -34,7 +34,7 @@ describe("validateAndCreateSession", () => {
 
   it("valid API key creates session and returns workspace name", async () => {
     const orgs = [{ id: "org1", name: "Acme Corp" }];
-    const workspaces = [{ id: "ws1", name: "Main Workspace" }];
+    const workspaces = [{ id: "ws1", name: "Main Workspace", organizationId: "org1" }];
 
     fetchSpy
       .mockResolvedValueOnce(jsonResponse(singlePage(orgs)))
@@ -97,6 +97,28 @@ describe("validateAndCreateSession", () => {
     expect(result).toEqual({
       error: "No workspaces found for this organization.",
     });
+  });
+
+  it("aggregates workspaces across multiple organizations", async () => {
+    const { validateApiKey } = await import("./start.js");
+    const orgs = [
+      { id: "org1", name: "Acme" },
+      { id: "org2", name: "NewCo" },
+    ];
+    const wsOrg1 = [{ id: "ws1", name: "Acme Main", organizationId: "org1" }];
+    const wsOrg2 = [{ id: "ws2", name: "NewCo Main", organizationId: "org2" }];
+
+    fetchSpy
+      .mockResolvedValueOnce(jsonResponse(singlePage(orgs)))
+      .mockResolvedValueOnce(jsonResponse(singlePage(wsOrg1)))
+      .mockResolvedValueOnce(jsonResponse(singlePage(wsOrg2)));
+
+    const result = await validateApiKey("sk_multi_org");
+
+    expect("error" in result).toBe(false);
+    if ("error" in result) return;
+    expect(result.workspaces.map((w) => w.id).sort()).toEqual(["ws1", "ws2"]);
+    expect(result.workspaces.find((w) => w.id === "ws2")?.organizationId).toBe("org2");
   });
 
   it("workspace list failure returns network error", async () => {
