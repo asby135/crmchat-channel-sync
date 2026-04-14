@@ -2,6 +2,7 @@ import { Markup, type Telegraf } from "telegraf";
 import type { ConfigStore } from "../config/store.js";
 import { CrmChatClient } from "../api/client.js";
 import { bulkSync, localizeSyncError } from "../handlers/sync.js";
+import { formatChannelSettings } from "../handlers/settings.js";
 import { resolveAccountAndAccessHash } from "../lib/resolve-channel.js";
 import { t } from "../i18n/index.js";
 
@@ -270,10 +271,26 @@ export function registerMyChatMemberListener(
   });
 
   bot.action(/^settings_first:(-?\d+)$/, async (ctx) => {
+    const channelId = Number(ctx.match[1]);
     const lang = ctx.from?.language_code;
     const l = t(lang);
     await ctx.answerCbQuery();
-    await ctx.editMessageText(l.settingsFirstMsg);
+
+    const ch = config.getChannelConfig(channelId);
+    if (!ch) {
+      await ctx.editMessageText(l.settingsChannelNotFound);
+      return;
+    }
+
+    await ctx.editMessageText(formatChannelSettings(ch, l), {
+      ...Markup.inlineKeyboard([
+        [
+          Markup.button.callback(l.settingsBtnSetMapping, `set_mapping:${channelId}`),
+          Markup.button.callback(l.settingsBtnRemoveMapping, `remove_mapping:${channelId}`),
+        ],
+        [Markup.button.callback(l.settingsBtnBack, "settings_back")],
+      ]),
+    });
   });
 
   bot.action(/^not_now:(-?\d+)$/, async (ctx) => {

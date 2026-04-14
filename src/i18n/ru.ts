@@ -111,7 +111,7 @@ export const ru: Locale = {
   settingsLeaveTextPrompt: "Введи значение при ВЫХОДЕ из этого канала:",
 
   settingsMappingSaved: (propName: string, joinLabel: string, leaveLabel: string) =>
-    `✅ Настройки сохранены!\n\n${propName}:\n  Вступление → ${joinLabel}\n  Выход → ${leaveLabel}\n\n💡 Настрой автоматические рассылки в @crmchat_crm_bot &gt; <b>Рассылки &gt; Лиды из CRM</b>.`,
+    `✅ Настройки сохранены!\n\n${propName}:\n  Вступление → ${joinLabel}\n  Выход → ${leaveLabel}\n\n💡 После синхронизации настрой автоматические рассылки в @crmchat_crm_bot &gt; <b>Рассылки &gt; Лиды из CRM</b>.`,
 
   settingsSessionExpiredCb: "Сессия истекла. Попробуй /settings ещё раз.",
 
@@ -120,7 +120,7 @@ export const ru: Locale = {
     `Меня добавили в ${title}! 🎉\n\nЧтобы синхронизировать подписчиков, сначала подключи аккаунт CRMChat — отправь /start в ЛС.`,
 
   promotedWithSession: (title: string, workspaceName: string) =>
-    `Меня добавили в ${title}! 🎉\n\nСинхронизировать подписчиков в CRMChat (${workspaceName})?\n\n💡 Совет: если хочешь отслеживать подписчиков через кастомное поле, сначала настрой его в /settings, а потом запускай синхронизацию.`,
+    `Меня добавили в ${title}! 🎉\n\nСинхронизировать подписчиков в CRMChat (${workspaceName})?\n\n💡 Совет: если хочешь отслеживать подписчиков через кастомные поля в CRMChat, сначала настрой их в /settings, а потом запускай синхронизацию.`,
 
   demoted: (title: string) =>
     `Меня удалили из ${title}. Синхронизация остановлена.`,

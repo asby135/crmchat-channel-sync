@@ -109,7 +109,7 @@ export const en = {
   settingsLeaveTextPrompt: "Type the value to set when someone LEAVES this channel:",
 
   settingsMappingSaved: (propName: string, joinLabel: string, leaveLabel: string) =>
-    `✅ Property mapping saved!\n\n${propName}:\n  Join → ${joinLabel}\n  Leave → ${leaveLabel}\n\n💡 Set up automated outreach in @crmchat_crm_bot &gt; <b>Outreach &gt; CRM Leads</b>.`,
+    `✅ Property mapping saved!\n\n${propName}:\n  Join → ${joinLabel}\n  Leave → ${leaveLabel}\n\n💡 After the sync, set up automated outreach in @crmchat_crm_bot &gt; <b>Outreach &gt; CRM Leads</b>.`,
 
   settingsSessionExpiredCb: "Session expired. Try /settings again.",
 
@@ -118,7 +118,7 @@ export const en = {
     `I've been added to ${title}! 🎉\n\nTo sync subscribers, connect your CRMChat account first — send /start in DM.`,
 
   promotedWithSession: (title: string, workspaceName: string) =>
-    `I've been added to ${title}! 🎉\n\nWant to sync its subscribers to your CRMChat workspace (${workspaceName})?\n\n💡 Tip: if you want to track subscribers with a custom property, set it up in /settings first, then run the sync.`,
+    `I've been added to ${title}! 🎉\n\nWant to sync its subscribers to your CRMChat workspace (${workspaceName})?\n\n💡 Tip: if you want to track subscribers via custom properties in CRMChat, set them up in /settings first, then run the sync.`,
 
   demoted: (title: string) =>
     `I've been removed from ${title}. Sync stopped.`,

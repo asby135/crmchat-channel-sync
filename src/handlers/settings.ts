@@ -56,7 +56,7 @@ export function formatTimeAgo(isoDate: string): string {
   return `${days}d ago`;
 }
 
-function formatChannelSettings(ch: ChannelConfig, l: Locale): string {
+export function formatChannelSettings(ch: ChannelConfig, l: Locale): string {
   const m = ch.propertyMapping;
   const lines = [
     l.settingsForChannel(ch.channelTitle),
