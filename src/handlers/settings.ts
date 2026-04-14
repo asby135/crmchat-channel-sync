@@ -82,6 +82,15 @@ function channelSettingsKeyboard(channelId: number, l: Locale) {
   ]);
 }
 
+// Keyboard shown right after a property mapping is saved, so the user can
+// kick off a sync without hunting for /sync.
+function mappingSavedKeyboard(channelId: number, l: Locale) {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback(l.syncNowBtn, `sync_channel:${channelId}`)],
+    [Markup.button.callback(l.settingsBtnBack, "settings_back")],
+  ]);
+}
+
 function isConfigurableProperty(prop: Property): boolean {
   if (!prop.key.startsWith("custom.")) return false;
   return prop.type === "single-select" || prop.type === "text";
@@ -415,7 +424,7 @@ export function registerSettingsHandler(
 
     await ctx.editMessageText(
       l.settingsMappingSaved(propName, joinLabel, leaveLabel),
-      { ...channelSettingsKeyboard(channelId, l) },
+      { ...mappingSavedKeyboard(channelId, l) },
     );
   });
 
@@ -465,6 +474,7 @@ export function registerSettingsHandler(
 
       await ctx.reply(
         l.settingsMappingSaved(state.propName, state.joinValue!, text),
+        { ...mappingSavedKeyboard(state.channelId, l) },
       );
     }
   });

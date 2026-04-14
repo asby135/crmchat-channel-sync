@@ -120,7 +120,7 @@ export const ru: Locale = {
     `Меня добавили в ${title}! 🎉\n\nЧтобы синхронизировать подписчиков, сначала подключи аккаунт CRMChat — отправь /start в ЛС.`,
 
   promotedWithSession: (title: string, workspaceName: string) =>
-    `Меня добавили в ${title}! 🎉\n\nСинхронизировать подписчиков в CRMChat (${workspaceName})?`,
+    `Меня добавили в ${title}! 🎉\n\nСинхронизировать подписчиков в CRMChat (${workspaceName})?\n\n💡 Совет: если хочешь отслеживать подписчиков через кастомное поле, сначала настрой его в /settings, а потом запускай синхронизацию.`,
 
   demoted: (title: string) =>
     `Меня удалили из ${title}. Синхронизация остановлена.`,
