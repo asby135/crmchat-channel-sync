@@ -87,7 +87,10 @@ function channelSettingsKeyboard(channelId: number, l: Locale) {
 function mappingSavedKeyboard(channelId: number, l: Locale) {
   return Markup.inlineKeyboard([
     [Markup.button.callback(l.syncNowBtn, `sync_channel:${channelId}`)],
-    [Markup.button.callback(l.settingsBtnBack, "settings_back")],
+    [
+      Markup.button.callback(l.mainMenuBtn, `main_menu:${channelId}`),
+      Markup.button.callback(l.settingsBtnBack, "settings_back"),
+    ],
   ]);
 }
 
@@ -148,6 +151,50 @@ export function registerSettingsHandler(
     await ctx.editMessageText(formatChannelSettings(ch, l), {
       ...channelSettingsKeyboard(channelId, l),
     });
+  });
+
+  // "Main menu" -> rebuild the "bot added to channel" promotion prompt
+  // for this channel so the user can pick Sync now / Settings first / Not now.
+  bot.action(/^main_menu:(-?\d+)$/, async (ctx) => {
+    const channelId = Number(ctx.match[1]);
+    const chatId = ctx.chat?.id;
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
+    await ctx.answerCbQuery();
+    if (!chatId) return;
+
+    const session = config.getSession(chatId);
+    if (!session) {
+      await ctx.editMessageText(l.settingsSessionExpired);
+      return;
+    }
+    const ch = config.getChannelConfig(channelId);
+    if (!ch) {
+      await ctx.editMessageText(l.settingsChannelNotFound);
+      return;
+    }
+
+    // Resolve workspace name for nicer messaging; fall back to ID on failure.
+    let workspaceName = session.workspaceId;
+    try {
+      const client = new CrmChatClient(session.apiKey);
+      const workspaces = await client.listWorkspaces(session.organizationId);
+      const ws = workspaces.find((w) => w.id === session.workspaceId);
+      if (ws) workspaceName = ws.name;
+    } catch {
+      // keep fallback
+    }
+
+    await ctx.editMessageText(
+      l.promotedWithSession(ch.channelTitle, workspaceName),
+      {
+        ...Markup.inlineKeyboard([
+          Markup.button.callback(l.syncNowBtn, `sync_now:${channelId}`),
+          Markup.button.callback(l.settingsFirstBtn, `settings_first:${channelId}`),
+          Markup.button.callback(l.notNowBtn, `not_now:${channelId}`),
+        ]),
+      },
+    );
   });
 
   // "Back" -> go back to channel list

@@ -128,6 +128,7 @@ export const ru: Locale = {
   syncNowBtn: "✅ Синхронизировать",
   settingsFirstBtn: "⚙️ Сначала настройки",
   notNowBtn: "❌ Не сейчас",
+  mainMenuBtn: "🏠 Главное меню",
 
   syncNowSessionExpired:
     "Сессия истекла. Сначала переподключись через /start.",

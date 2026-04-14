@@ -126,6 +126,7 @@ export const en = {
   syncNowBtn: "✅ Sync now",
   settingsFirstBtn: "⚙️ Settings first",
   notNowBtn: "❌ Not now",
+  mainMenuBtn: "🏠 Main menu",
 
   syncNowSessionExpired:
     "Session expired. Reconnect with /start first.",
