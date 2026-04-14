@@ -134,9 +134,6 @@ export const en = {
   syncNowResolveFailed: (reason: string) =>
     `❌ Couldn't resolve channel.\n\n${reason}\n\n⚠️ Note: the connected Telegram account must be an <b>admin</b> of the channel you want to sync.`,
 
-  settingsFirstMsg:
-    "Head to /settings to configure custom properties, then come back to sync.",
-
   notNowMsg: "No problem! You can sync anytime with /sync.",
 
   pickWorkspace: "This API key has access to multiple workspaces.\n\nWhich one do you want to connect?",
