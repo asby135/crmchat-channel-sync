@@ -85,6 +85,50 @@ interface TelegramUser {
   username?: string;
 }
 
+/**
+ * Create a CRM contact for a Telegram user, filling required custom property
+ * defaults and setting the tracked property to `mappedValue` (join or leave
+ * value) when a mapping is configured. Returns the full name used, for logging.
+ */
+async function createContactForUser(
+  client: CrmChatClient,
+  workspaceId: string,
+  user: TelegramUser,
+  propertyMapping: PropertyMapping | undefined,
+  mappedValue: string | undefined,
+): Promise<string> {
+  const properties = await client.listProperties(workspaceId);
+  const customDefaults: Record<string, string> = {};
+  for (const prop of properties) {
+    if (prop.required && prop.key.startsWith("custom.")) {
+      const shortKey = prop.key.replace(/^custom\./, "");
+      const defaultVal = prop.options?.[0]?.value ?? "";
+      if (defaultVal) customDefaults[shortKey] = defaultVal;
+    }
+  }
+
+  const fullName = buildFullName(user.first_name, user.last_name, user.id);
+  const input: CreateContactInput = {
+    fullName,
+    telegram: {
+      id: user.id,
+      username: user.username || undefined,
+    },
+  };
+
+  if (Object.keys(customDefaults).length > 0 || (propertyMapping && mappedValue)) {
+    input.custom = { ...customDefaults };
+    if (propertyMapping && mappedValue) {
+      const key = propertyMapping.propertyKey.replace(/^custom\./, "");
+      input.custom[key] = mappedValue;
+    }
+  }
+
+  await sleep(100);
+  await client.createContact(workspaceId, input);
+  return fullName;
+}
+
 async function handleJoin(
   client: CrmChatClient,
   workspaceId: string,
@@ -115,36 +159,13 @@ async function handleJoin(
     return;
   }
 
-  // Create new contact — fetch required properties for defaults
-  const properties = await client.listProperties(workspaceId);
-  const customDefaults: Record<string, string> = {};
-  for (const prop of properties) {
-    if (prop.required && prop.key.startsWith("custom.")) {
-      const shortKey = prop.key.replace(/^custom\./, "");
-      const defaultVal = prop.options?.[0]?.value ?? "";
-      if (defaultVal) customDefaults[shortKey] = defaultVal;
-    }
-  }
-
-  const fullName = buildFullName(user.first_name, user.last_name, user.id);
-  const input: CreateContactInput = {
-    fullName,
-    telegram: {
-      id: user.id,
-      username: user.username || undefined,
-    },
-  };
-
-  if (Object.keys(customDefaults).length > 0 || propertyMapping) {
-    input.custom = { ...customDefaults };
-    if (propertyMapping) {
-      const key = propertyMapping.propertyKey.replace(/^custom\./, "");
-      input.custom[key] = propertyMapping.joinValue;
-    }
-  }
-
-  await sleep(100);
-  await client.createContact(workspaceId, input);
+  const fullName = await createContactForUser(
+    client,
+    workspaceId,
+    user,
+    propertyMapping,
+    propertyMapping?.joinValue,
+  );
   console.log(
     `[chat_member] JOIN (created) ${channelTitle}: ${fullName} (${user.id})`,
   );
@@ -162,22 +183,31 @@ async function handleLeave(
     filter: { "telegram.id": user.id },
   });
 
-  if (existing.length === 0) {
+  if (existing.length > 0) {
+    if (propertyMapping) {
+      const key = propertyMapping.propertyKey.replace(/^custom\./, "");
+      await sleep(100);
+      await client.updateContact(workspaceId, existing[0].id, {
+        custom: { [key]: propertyMapping.leaveValue },
+      });
+    }
     console.log(
-      `[chat_member] LEAVE (not found) ${channelTitle}: ${user.first_name} (${user.id})`,
+      `[chat_member] LEAVE ${channelTitle}: ${user.first_name} (${user.id})`,
     );
     return;
   }
 
-  if (propertyMapping) {
-    const key = propertyMapping.propertyKey.replace(/^custom\./, "");
-    await sleep(100);
-    await client.updateContact(workspaceId, existing[0].id, {
-      custom: { [key]: propertyMapping.leaveValue },
-    });
-  }
-
+  // No prior contact — initial sync was never run. Create the contact now
+  // with the leave value so subscribers who churn before the first /sync
+  // still land in CRM (and are tagged as "left" rather than silently dropped).
+  const fullName = await createContactForUser(
+    client,
+    workspaceId,
+    user,
+    propertyMapping,
+    propertyMapping?.leaveValue,
+  );
   console.log(
-    `[chat_member] LEAVE ${channelTitle}: ${user.first_name} (${user.id})`,
+    `[chat_member] LEAVE (created) ${channelTitle}: ${fullName} (${user.id})`,
   );
 }
