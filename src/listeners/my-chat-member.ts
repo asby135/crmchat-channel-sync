@@ -4,7 +4,8 @@ import { CrmChatClient } from "../api/client.js";
 import { bulkSync, localizeSyncError } from "../handlers/sync.js";
 import { formatChannelSettings } from "../handlers/settings.js";
 import { findDefaultStageMapping } from "../lib/default-mapping.js";
-import type { PropertyMapping } from "../config/types.js";
+import { buildPromotionMenu } from "../lib/promotion-menu.js";
+import type { ChannelConfig, PropertyMapping } from "../config/types.js";
 import { resolveAccountAndAccessHash } from "../lib/resolve-channel.js";
 import { t } from "../i18n/index.js";
 
@@ -88,7 +89,7 @@ export function registerMyChatMemberListener(
       }
 
       // Save channel config now so /settings can find it even if user picks "Settings first"
-      config.setChannelConfig(channelId, {
+      const channelConfig: ChannelConfig = {
         channelId,
         channelTitle,
         workspaceId: session.workspaceId,
@@ -97,32 +98,11 @@ export function registerMyChatMemberListener(
         apiKey: session.apiKey,
         propertyMapping: defaultMapping,
         addedAt: new Date().toISOString(),
-      });
+      };
+      config.setChannelConfig(channelId, channelConfig);
 
-      await ctx.telegram.sendMessage(
-        from.id,
-        l.promotedWithSession(
-          channelTitle,
-          workspaceName,
-          defaultMapping
-            ? {
-                joinLabel: defaultMapping.joinLabel,
-                leaveLabel: defaultMapping.leaveLabel,
-                propertyName: defaultMapping.propertyName,
-              }
-            : undefined,
-        ),
-        {
-          ...Markup.inlineKeyboard([
-            Markup.button.callback(l.syncNowBtn, `sync_now:${channelId}`),
-            Markup.button.callback(
-              l.settingsFirstBtn,
-              `settings_first:${channelId}`,
-            ),
-            Markup.button.callback(l.notNowBtn, `not_now:${channelId}`),
-          ]),
-        },
-      );
+      const { text, extra } = buildPromotionMenu(channelConfig, workspaceName, l);
+      await ctx.telegram.sendMessage(from.id, text, extra);
     }
 
     if (action === "demoted") {
