@@ -108,6 +108,7 @@ export function registerMyChatMemberListener(
             ? {
                 joinLabel: defaultMapping.joinLabel,
                 leaveLabel: defaultMapping.leaveLabel,
+                propertyName: defaultMapping.propertyName,
               }
             : undefined,
         ),
