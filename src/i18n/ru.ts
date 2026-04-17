@@ -169,4 +169,8 @@ export const ru: Locale = {
 
   switchWorkspaceBtn: "🔄 Подключить другое пространство",
   switchWorkspaceMsg: "Предыдущее пространство отключено.\n\nОтправь новый API-ключ для подключения другого пространства.",
+
+  mainMenuPickChannel: "Какой канал?",
+  mainMenuNoChannels: (workspaceName: string) =>
+    `Подключено к ${workspaceName}, но каналов пока нет.\n\nДобавь меня админом в Telegram-канал или группу, чтобы начать отслеживать подписчиков.\n\nℹ️ Особые права не нужны — достаточно статуса админа.`,
 };

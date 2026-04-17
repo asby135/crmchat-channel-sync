@@ -167,4 +167,8 @@ export const en = {
 
   switchWorkspaceBtn: "🔄 Connect another workspace",
   switchWorkspaceMsg: "Previous workspace disconnected.\n\nSend me a new API key to connect a different workspace.",
+
+  mainMenuPickChannel: "Which channel?",
+  mainMenuNoChannels: (workspaceName: string) =>
+    `Connected to ${workspaceName}, but no channels yet.\n\nAdd me as admin to a Telegram channel or group to start tracking subscribers.\n\nℹ️ No specific permissions needed — just admin status is enough.`,
 };

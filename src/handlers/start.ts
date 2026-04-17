@@ -4,6 +4,7 @@ import type { Workspace } from "../api/types.js";
 import type { ConfigStore } from "../config/store.js";
 import { isInTextInputFlow } from "./settings.js";
 import { t } from "../i18n/index.js";
+import { buildPromotionMenu } from "../lib/promotion-menu.js";
 
 // ── Pending API key cache (for workspace picker flow) ───────────────
 
@@ -147,12 +148,61 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
     if (session) {
       await ctx.reply(l.alreadyConnected(session.workspaceId), {
         ...Markup.inlineKeyboard([
-          Markup.button.callback(l.switchWorkspaceBtn, "switch_workspace"),
+          [Markup.button.callback(l.mainMenuBtn, "main_menu_global")],
+          [Markup.button.callback(l.switchWorkspaceBtn, "switch_workspace")],
         ]),
       });
     } else {
       await ctx.reply(l.welcome);
     }
+  });
+
+  // Global "Main menu" — branches on how many channels exist for the
+  // current workspace: zero shows the "add me as admin" prompt, one
+  // jumps straight into that channel's promotion menu, many shows a picker.
+  bot.action("main_menu_global", async (ctx) => {
+    const chatId = ctx.chat?.id;
+    const lang = ctx.from?.language_code;
+    const l = t(lang);
+    await ctx.answerCbQuery();
+    if (!chatId) return;
+
+    const session = config.getSession(chatId);
+    if (!session) {
+      await ctx.editMessageText(l.settingsSessionExpired);
+      return;
+    }
+
+    // Resolve workspace name once for both branches.
+    let workspaceName = session.workspaceId;
+    try {
+      const apiClient = new CrmChatClient(session.apiKey);
+      const workspaces = await apiClient.listWorkspaces(session.organizationId);
+      const ws = workspaces.find((w) => w.id === session.workspaceId);
+      if (ws) workspaceName = ws.name;
+    } catch {
+      // keep fallback
+    }
+
+    const channels = config.getChannelsByWorkspace(session.workspaceId);
+
+    if (channels.length === 0) {
+      await ctx.editMessageText(l.mainMenuNoChannels(workspaceName));
+      return;
+    }
+
+    if (channels.length === 1) {
+      const { text, extra } = buildPromotionMenu(channels[0], workspaceName, l);
+      await ctx.editMessageText(text, extra);
+      return;
+    }
+
+    const buttons = channels.map((ch) =>
+      Markup.button.callback(ch.channelTitle, `main_menu:${ch.channelId}`),
+    );
+    await ctx.editMessageText(l.mainMenuPickChannel, {
+      ...Markup.inlineKeyboard(buttons, { columns: 2 }),
+    });
   });
 
   // Workspace picker callback

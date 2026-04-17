@@ -4,6 +4,7 @@ import type { Property } from "../api/types.js";
 import type { ConfigStore } from "../config/store.js";
 import type { ChannelConfig, PropertyMapping } from "../config/types.js";
 import { t, type Locale } from "../i18n/index.js";
+import { buildPromotionMenu } from "../lib/promotion-menu.js";
 
 // ── Callback data cache (Telegram 64-byte limit workaround) ────────
 
@@ -185,16 +186,8 @@ export function registerSettingsHandler(
       // keep fallback
     }
 
-    await ctx.editMessageText(
-      l.promotedWithSession(ch.channelTitle, workspaceName),
-      {
-        ...Markup.inlineKeyboard([
-          Markup.button.callback(l.syncNowBtn, `sync_now:${channelId}`),
-          Markup.button.callback(l.settingsFirstBtn, `settings_first:${channelId}`),
-          Markup.button.callback(l.notNowBtn, `not_now:${channelId}`),
-        ]),
-      },
-    );
+    const { text, extra } = buildPromotionMenu(ch, workspaceName, l);
+    await ctx.editMessageText(text, extra);
   });
 
   // "Back" -> go back to channel list
