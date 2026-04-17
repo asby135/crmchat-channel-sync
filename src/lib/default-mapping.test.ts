@@ -2,18 +2,22 @@ import { describe, it, expect } from "vitest";
 import { findDefaultStageMapping } from "./default-mapping.js";
 import type { Property } from "../api/types.js";
 
-function stageProp(options: Array<{ label: string; value: string }>): Property {
+function stageProp(
+  options: Array<{ label: string; value: string }>,
+  overrides: Partial<Property> = {},
+): Property {
   return {
     key: "custom.stage",
     name: "Stage",
     type: "single-select",
     required: false,
     options,
+    ...overrides,
   };
 }
 
 describe("findDefaultStageMapping", () => {
-  it("returns mapping when Lead and Closed are present in the same property", () => {
+  it("uses first option for joins and last option for leaves", () => {
     const props: Property[] = [
       stageProp([
         { label: "Lead", value: "lead" },
@@ -36,42 +40,23 @@ describe("findDefaultStageMapping", () => {
     });
   });
 
-  it("matches case-insensitively and trims whitespace", () => {
+  it("works on non-English / customized labels (no exact-name search)", () => {
     const props: Property[] = [
       stageProp([
-        { label: " LEAD ", value: "v1" },
-        { label: "closed", value: "v2" },
+        { label: "Новый интерес", value: "new" },
+        { label: "В работе", value: "wip" },
+        { label: "Отписался", value: "churned" },
       ]),
     ];
 
     const mapping = findDefaultStageMapping(props);
 
-    expect(mapping?.joinValue).toBe("v1");
-    expect(mapping?.leaveValue).toBe("v2");
+    expect(mapping?.joinLabel).toBe("Новый интерес");
+    expect(mapping?.leaveLabel).toBe("Отписался");
   });
 
-  it("falls back to Russian labels", () => {
-    const props: Property[] = [
-      stageProp([
-        { label: "Лид", value: "ru_lead" },
-        { label: "Закрыто", value: "ru_closed" },
-      ]),
-    ];
-
-    const mapping = findDefaultStageMapping(props);
-
-    expect(mapping?.joinValue).toBe("ru_lead");
-    expect(mapping?.leaveValue).toBe("ru_closed");
-  });
-
-  it("returns undefined when only one of Lead / Closed exists", () => {
-    const props: Property[] = [
-      stageProp([
-        { label: "Lead", value: "lead" },
-        { label: "Won", value: "won" },
-      ]),
-    ];
-
+  it("returns undefined when only one option exists", () => {
+    const props: Property[] = [stageProp([{ label: "Lead", value: "lead" }])];
     expect(findDefaultStageMapping(props)).toBeUndefined();
   });
 
@@ -84,24 +69,58 @@ describe("findDefaultStageMapping", () => {
         required: false,
       },
       stageProp([
-        { label: "Lead", value: "lead" },
-        { label: "Closed", value: "closed" },
+        { label: "A", value: "a" },
+        { label: "B", value: "b" },
       ]),
+    ];
+    expect(findDefaultStageMapping(props)?.propertyKey).toBe("custom.stage");
+  });
+
+  it("ignores built-in (non-custom) properties", () => {
+    // Built-ins are system-managed; only consider custom.* like /settings does.
+    const props: Property[] = [
+      stageProp(
+        [
+          { label: "Open", value: "o" },
+          { label: "Closed", value: "c" },
+        ],
+        { key: "status", name: "Status" },
+      ),
+      stageProp(
+        [
+          { label: "First", value: "f" },
+          { label: "Last", value: "l" },
+        ],
+        { key: "custom.pipeline", name: "Pipeline" },
+      ),
     ];
 
     const mapping = findDefaultStageMapping(props);
-    expect(mapping?.propertyKey).toBe("custom.stage");
+    expect(mapping?.propertyKey).toBe("custom.pipeline");
   });
 
-  it("returns undefined for empty or non-stage workspaces", () => {
+  it("picks the first eligible custom single-select when several exist", () => {
+    const props: Property[] = [
+      stageProp(
+        [
+          { label: "A1", value: "a1" },
+          { label: "A2", value: "a2" },
+        ],
+        { key: "custom.first", name: "First" },
+      ),
+      stageProp(
+        [
+          { label: "B1", value: "b1" },
+          { label: "B2", value: "b2" },
+        ],
+        { key: "custom.second", name: "Second" },
+      ),
+    ];
+
+    expect(findDefaultStageMapping(props)?.propertyKey).toBe("custom.first");
+  });
+
+  it("returns undefined for empty workspaces", () => {
     expect(findDefaultStageMapping([])).toBeUndefined();
-    expect(
-      findDefaultStageMapping([
-        stageProp([
-          { label: "New", value: "new" },
-          { label: "Won", value: "won" },
-        ]),
-      ]),
-    ).toBeUndefined();
   });
 });
