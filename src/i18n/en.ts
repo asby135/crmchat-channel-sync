@@ -140,7 +140,9 @@ export const en = {
     }
     lines.push(
       "",
-      "🔄 To back-fill existing subscribers, connect a Telegram account in @crmchat_crm_bot &gt; <b>Telegram accounts</b> (required to read the subscriber list), then tap <b>Sync now</b> below.",
+      "🔄 To back-fill existing subscribers, connect a Telegram account (channel admin) in @crmchat_crm_bot &gt; <b>Telegram accounts</b> (required to read the subscriber list), then tap <b>Sync now</b> below.",
+      "",
+      "ℹ️ Sync is a one-time action. After the sync, you can disconnect your main account and connect different accounts to run message sequences.",
     );
     return lines.join("\n");
   },
