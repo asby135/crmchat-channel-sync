@@ -6,7 +6,7 @@ export const ru: Locale = {
     "Привет! 👋\n\nОтправь мне API-ключ CRMChat, чтобы начать.\n\nНайти его можно в <b>Настройки &gt; API-ключи</b> в @crmchat_crm_bot.",
 
   connectedToWorkspace: (name: string) =>
-    `✅ Подключено к ${name}!\n\nТеперь добавь меня админом в каналы или группы, которые хочешь синхронизировать.`,
+    `✅ Подключено к ${name}!\n\nТеперь добавь меня админом в каналы или группы, которые хочешь синхронизировать.\n\nℹ️ Особые права не нужны — достаточно статуса админа.`,
 
   alreadyConnected: (workspaceId: string) =>
     `Ты уже подключён к рабочему пространству ${workspaceId}.\n\nИспользуй /sync для синхронизации канала или сначала настрой кастомные поля в /settings.`,
@@ -119,8 +119,33 @@ export const ru: Locale = {
   promotedNoSession: (title: string) =>
     `Меня добавили в ${title}! 🎉\n\nЧтобы синхронизировать подписчиков, сначала подключи аккаунт CRMChat — отправь /start в ЛС.`,
 
-  promotedWithSession: (title: string, workspaceName: string) =>
-    `Меня добавили в ${title}! 🎉\n\nСинхронизировать подписчиков в CRMChat (${workspaceName})?\n\n💡 Совет: если хочешь отслеживать подписчиков через кастомные поля в CRMChat, сначала настрой их в /settings, а потом запускай синхронизацию.`,
+  promotedWithSession: (
+    title: string,
+    workspaceName: string,
+    defaultMapping?: { joinLabel: string; leaveLabel: string; propertyName: string },
+  ) => {
+    const lines = [
+      `Меня добавили в ${title}! 🎉`,
+      "",
+      `✅ Новые подписчики будут автоматически синхронизироваться в CRMChat (${workspaceName}).`,
+    ];
+    if (defaultMapping) {
+      lines.push(
+        "",
+        `📋 По умолчанию поле <b>${defaultMapping.propertyName}</b>: вступление → <b>${defaultMapping.joinLabel}</b>, выход → <b>${defaultMapping.leaveLabel}</b>. Поменять можно в /settings.`,
+      );
+    } else {
+      lines.push(
+        "",
+        "💡 Совет: если хочешь отслеживать подписчиков через кастомное поле в CRMChat, настрой его в /settings.",
+      );
+    }
+    lines.push(
+      "",
+      "🔄 Чтобы подтянуть существующих подписчиков, подключи Telegram-аккаунт в @crmchat_crm_bot &gt; <b>Telegram accounts</b> (это нужно, чтобы получить список подписчиков), а потом нажми <b>Синхронизировать</b> ниже.",
+    );
+    return lines.join("\n");
+  },
 
   demoted: (title: string) =>
     `Меня удалили из ${title}. Синхронизация остановлена.`,

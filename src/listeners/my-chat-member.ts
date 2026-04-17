@@ -3,6 +3,8 @@ import type { ConfigStore } from "../config/store.js";
 import { CrmChatClient } from "../api/client.js";
 import { bulkSync, localizeSyncError } from "../handlers/sync.js";
 import { formatChannelSettings } from "../handlers/settings.js";
+import { findDefaultStageMapping } from "../lib/default-mapping.js";
+import type { PropertyMapping } from "../config/types.js";
 import { resolveAccountAndAccessHash } from "../lib/resolve-channel.js";
 import { t } from "../i18n/index.js";
 
@@ -67,15 +69,22 @@ export function registerMyChatMemberListener(
         return;
       }
 
-      // Try to get workspace name for nicer messaging
+      // Try to get workspace name and a default Lead/Closed mapping for
+      // nicer onboarding (so the user doesn't have to open /settings to
+      // start tracking joins/leaves on a fresh workspace).
       let workspaceName = session.workspaceId;
+      let defaultMapping: PropertyMapping | undefined;
       try {
         const client = new CrmChatClient(session.apiKey);
-        const workspaces = await client.listWorkspaces(session.organizationId);
+        const [workspaces, properties] = await Promise.all([
+          client.listWorkspaces(session.organizationId),
+          client.listProperties(session.workspaceId).catch(() => []),
+        ]);
         const ws = workspaces.find((w) => w.id === session.workspaceId);
         if (ws) workspaceName = ws.name;
+        defaultMapping = findDefaultStageMapping(properties);
       } catch {
-        // Fall back to workspace ID
+        // Fall back to workspace ID and no default mapping
       }
 
       // Save channel config now so /settings can find it even if user picks "Settings first"
@@ -86,12 +95,23 @@ export function registerMyChatMemberListener(
         accountId: "",       // resolved later during sync
         accessHash: "",      // resolved later during sync
         apiKey: session.apiKey,
+        propertyMapping: defaultMapping,
         addedAt: new Date().toISOString(),
       });
 
       await ctx.telegram.sendMessage(
         from.id,
-        l.promotedWithSession(channelTitle, workspaceName),
+        l.promotedWithSession(
+          channelTitle,
+          workspaceName,
+          defaultMapping
+            ? {
+                joinLabel: defaultMapping.joinLabel,
+                leaveLabel: defaultMapping.leaveLabel,
+                propertyName: defaultMapping.propertyName,
+              }
+            : undefined,
+        ),
         {
           ...Markup.inlineKeyboard([
             Markup.button.callback(l.syncNowBtn, `sync_now:${channelId}`),

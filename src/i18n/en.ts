@@ -4,7 +4,7 @@ export const en = {
     "Hey! 👋\n\nSend me your CRMChat API key to get started.\n\nFind it in <b>Settings &gt; API Keys</b> in @crmchat_crm_bot.",
 
   connectedToWorkspace: (name: string) =>
-    `✅ Connected to ${name}!\n\nNow add me as admin to the channels or groups you want to sync.`,
+    `✅ Connected to ${name}!\n\nNow add me as admin to the channels or groups you want to sync.\n\nℹ️ No specific permissions needed — just admin status is enough.`,
 
   alreadyConnected: (workspaceId: string) =>
     `You're already connected to workspace ${workspaceId}.\n\nUse /sync to sync a channel, or configure custom properties first in /settings.`,
@@ -117,8 +117,33 @@ export const en = {
   promotedNoSession: (title: string) =>
     `I've been added to ${title}! 🎉\n\nTo sync subscribers, connect your CRMChat account first — send /start in DM.`,
 
-  promotedWithSession: (title: string, workspaceName: string) =>
-    `I've been added to ${title}! 🎉\n\nWant to sync its subscribers to your CRMChat workspace (${workspaceName})?\n\n💡 Tip: if you want to track subscribers via custom properties in CRMChat, set them up in /settings first, then run the sync.`,
+  promotedWithSession: (
+    title: string,
+    workspaceName: string,
+    defaultMapping?: { joinLabel: string; leaveLabel: string; propertyName: string },
+  ) => {
+    const lines = [
+      `I've been added to ${title}! 🎉`,
+      "",
+      `✅ New subscribers will sync to CRMChat (${workspaceName}) automatically from now on.`,
+    ];
+    if (defaultMapping) {
+      lines.push(
+        "",
+        `📋 Default ${defaultMapping.propertyName} tracking: joins → <b>${defaultMapping.joinLabel}</b>, leaves → <b>${defaultMapping.leaveLabel}</b>. Change anytime in /settings.`,
+      );
+    } else {
+      lines.push(
+        "",
+        "💡 Tip: if you want to track subscribers via a custom property in CRMChat, set it up in /settings.",
+      );
+    }
+    lines.push(
+      "",
+      "🔄 To back-fill existing subscribers, connect a Telegram account in @crmchat_crm_bot &gt; <b>Telegram accounts</b> (required to read the subscriber list), then tap <b>Sync now</b> below.",
+    );
+    return lines.join("\n");
+  },
 
   demoted: (title: string) =>
     `I've been removed from ${title}. Sync stopped.`,
