@@ -75,11 +75,12 @@ export function formatChannelSettings(ch: ChannelConfig, l: Locale): string {
 
 function channelSettingsKeyboard(channelId: number, l: Locale) {
   return Markup.inlineKeyboard([
+    [Markup.button.callback(l.settingsBtnSetMapping, `set_mapping:${channelId}`)],
+    [Markup.button.callback(l.settingsBtnRemoveMapping, `remove_mapping:${channelId}`)],
     [
-      Markup.button.callback(l.settingsBtnSetMapping, `set_mapping:${channelId}`),
-      Markup.button.callback(l.settingsBtnRemoveMapping, `remove_mapping:${channelId}`),
+      Markup.button.callback(l.mainMenuBtn, `main_menu:${channelId}`),
+      Markup.button.callback(l.settingsBtnBack, "settings_back"),
     ],
-    [Markup.button.callback(l.settingsBtnBack, "settings_back")],
   ]);
 }
 
