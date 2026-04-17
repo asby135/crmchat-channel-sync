@@ -120,7 +120,7 @@ export const en = {
   promotedWithSession: (
     title: string,
     workspaceName: string,
-    defaultMapping?: { joinLabel: string; leaveLabel: string; propertyName: string },
+    defaultMapping?: { joinLabel: string; leaveLabel: string },
   ) => {
     const lines = [
       `I've been added to ${title}! 🎉`,
@@ -130,7 +130,7 @@ export const en = {
     if (defaultMapping) {
       lines.push(
         "",
-        `📋 Default ${defaultMapping.propertyName} tracking: joins → <b>${defaultMapping.joinLabel}</b>, leaves → <b>${defaultMapping.leaveLabel}</b>. Change anytime in /settings.`,
+        `📋 Subscriber tracking: new subs → <b>${defaultMapping.joinLabel}</b>, unsubs → <b>${defaultMapping.leaveLabel}</b>. Change anytime in /settings. Change these custom properties in @crmchat_crm_bot &gt; <b>Custom Properties</b>.`,
       );
     } else {
       lines.push(
@@ -151,7 +151,7 @@ export const en = {
     `I've been removed from ${title}. Sync stopped.`,
 
   syncNowBtn: "✅ Sync now",
-  settingsFirstBtn: "⚙️ Settings first",
+  settingsFirstBtn: "⚙️ Settings",
   notNowBtn: "❌ Not now",
   mainMenuBtn: "🏠 Main menu",
 

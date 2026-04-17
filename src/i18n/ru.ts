@@ -122,7 +122,7 @@ export const ru: Locale = {
   promotedWithSession: (
     title: string,
     workspaceName: string,
-    defaultMapping?: { joinLabel: string; leaveLabel: string; propertyName: string },
+    defaultMapping?: { joinLabel: string; leaveLabel: string },
   ) => {
     const lines = [
       `Меня добавили в ${title}! 🎉`,
@@ -132,7 +132,7 @@ export const ru: Locale = {
     if (defaultMapping) {
       lines.push(
         "",
-        `📋 По умолчанию поле <b>${defaultMapping.propertyName}</b>: вступление → <b>${defaultMapping.joinLabel}</b>, выход → <b>${defaultMapping.leaveLabel}</b>. Поменять можно в /settings.`,
+        `📋 Отслеживание подписчиков: новые → <b>${defaultMapping.joinLabel}</b>, отписавшиеся → <b>${defaultMapping.leaveLabel}</b>. Поменять можно в /settings. Сами кастомные поля меняются в @crmchat_crm_bot &gt; <b>Кастомные поля</b>.`,
       );
     } else {
       lines.push(
@@ -153,7 +153,7 @@ export const ru: Locale = {
     `Меня удалили из ${title}. Синхронизация остановлена.`,
 
   syncNowBtn: "✅ Синхронизировать",
-  settingsFirstBtn: "⚙️ Сначала настройки",
+  settingsFirstBtn: "⚙️ Настройки",
   notNowBtn: "❌ Не сейчас",
   mainMenuBtn: "🏠 Главное меню",
 
