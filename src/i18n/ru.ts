@@ -129,7 +129,7 @@ export const ru: Locale = {
     if (defaultMapping) {
       lines.push(
         "",
-        `📋 Отслеживание подписчиков через <b>${defaultMapping.propertyName}</b>: новые → <b>${defaultMapping.joinLabel}</b>, отписавшиеся → <b>${defaultMapping.leaveLabel}</b>. Поменять можно в /settings. Сами кастомные поля меняются в @crmchat_crm_bot &gt; <b>Кастомные поля</b>.`,
+        `📋 Отслеживание подписчиков через <b>${defaultMapping.propertyName}</b>: новые → <b>${defaultMapping.joinLabel}</b>, отписавшиеся → <b>${defaultMapping.leaveLabel}</b>. Настроить другие поля можно в /settings. Сами кастомные поля меняются в @crmchat_crm_bot &gt; <b>Кастомные поля</b>.`,
       );
     } else {
       lines.push(

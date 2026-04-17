@@ -127,7 +127,7 @@ export const en = {
     if (defaultMapping) {
       lines.push(
         "",
-        `📋 Subscriber tracking via <b>${defaultMapping.propertyName}</b>: new subs → <b>${defaultMapping.joinLabel}</b>, unsubs → <b>${defaultMapping.leaveLabel}</b>. Change anytime in /settings. Change these custom properties in @crmchat_crm_bot &gt; <b>Custom Properties</b>.`,
+        `📋 Subscriber tracking via <b>${defaultMapping.propertyName}</b>: new subs → <b>${defaultMapping.joinLabel}</b>, unsubs → <b>${defaultMapping.leaveLabel}</b>. Set up different properties in /settings. Change these custom properties in @crmchat_crm_bot &gt; <b>Custom Properties</b>.`,
       );
     } else {
       lines.push(
