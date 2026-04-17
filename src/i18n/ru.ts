@@ -8,9 +8,6 @@ export const ru: Locale = {
   connectedToWorkspace: (name: string) =>
     `✅ Подключено к ${name}!\n\nТеперь добавь меня админом в каналы или группы, которые хочешь синхронизировать.\n\nℹ️ Особые права не нужны — достаточно статуса админа.`,
 
-  alreadyConnected: (workspaceId: string) =>
-    `Ты уже подключён к рабочему пространству ${workspaceId}.\n\nИспользуй /sync для синхронизации канала или сначала настрой кастомные поля в /settings.`,
-
   invalidApiKey: "❌ Неверный API-ключ.\n\nПроверь в <b>Настройки &gt; API-ключи</b> в @crmchat_crm_bot.",
   apiUnreachable: "⚠️ Не удалось связаться с CRMChat API. Попробуй чуть позже.",
   noOrganizations: "Организации для этого API-ключа не найдены.",

@@ -98,6 +98,53 @@ function localizeError(error: string, lang: string | undefined): string {
   return map[error] ?? error;
 }
 
+// ── Main menu rendering (shared by /start and main_menu_global) ─────
+
+type MainMenuRender = (text: string, extra: object) => Promise<unknown>;
+
+async function renderMainMenu(
+  config: ConfigStore,
+  session: { apiKey: string; workspaceId: string; organizationId: string },
+  lang: string | undefined,
+  render: MainMenuRender,
+): Promise<void> {
+  const l = t(lang);
+
+  // Resolve workspace name once for all branches.
+  let workspaceName = session.workspaceId;
+  try {
+    const apiClient = new CrmChatClient(session.apiKey);
+    const workspaces = await apiClient.listWorkspaces(session.organizationId);
+    const ws = workspaces.find((w) => w.id === session.workspaceId);
+    if (ws) workspaceName = ws.name;
+  } catch {
+    // keep fallback
+  }
+
+  const channels = config.getChannelsByWorkspace(session.workspaceId);
+  const switchRow = [Markup.button.callback(l.switchWorkspaceBtn, "switch_workspace")];
+
+  if (channels.length === 0) {
+    await render(l.mainMenuNoChannels(workspaceName), {
+      ...Markup.inlineKeyboard([switchRow]),
+    });
+    return;
+  }
+
+  if (channels.length === 1) {
+    const { text, extra } = buildPromotionMenu(channels[0], workspaceName, l);
+    await render(text, extra);
+    return;
+  }
+
+  const channelRows = channels.map((ch) => [
+    Markup.button.callback(ch.channelTitle, `main_menu:${ch.channelId}`),
+  ]);
+  await render(l.mainMenuPickChannel, {
+    ...Markup.inlineKeyboard([...channelRows, switchRow]),
+  });
+}
+
 // ── Handler registration ─────────────────────────────────────────────
 
 export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
@@ -146,12 +193,9 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
     // Flow B: no deep link
     const session = config.getSession(chatId);
     if (session) {
-      await ctx.reply(l.alreadyConnected(session.workspaceId), {
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback(l.mainMenuBtn, "main_menu_global")],
-          [Markup.button.callback(l.switchWorkspaceBtn, "switch_workspace")],
-        ]),
-      });
+      await renderMainMenu(config, session, lang, (text, extra) =>
+        ctx.reply(text, extra),
+      );
     } else {
       await ctx.reply(l.welcome);
     }
@@ -173,36 +217,9 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
       return;
     }
 
-    // Resolve workspace name once for both branches.
-    let workspaceName = session.workspaceId;
-    try {
-      const apiClient = new CrmChatClient(session.apiKey);
-      const workspaces = await apiClient.listWorkspaces(session.organizationId);
-      const ws = workspaces.find((w) => w.id === session.workspaceId);
-      if (ws) workspaceName = ws.name;
-    } catch {
-      // keep fallback
-    }
-
-    const channels = config.getChannelsByWorkspace(session.workspaceId);
-
-    if (channels.length === 0) {
-      await ctx.editMessageText(l.mainMenuNoChannels(workspaceName));
-      return;
-    }
-
-    if (channels.length === 1) {
-      const { text, extra } = buildPromotionMenu(channels[0], workspaceName, l);
-      await ctx.editMessageText(text, extra);
-      return;
-    }
-
-    const buttons = channels.map((ch) =>
-      Markup.button.callback(ch.channelTitle, `main_menu:${ch.channelId}`),
+    await renderMainMenu(config, session, lang, (text, extra) =>
+      ctx.editMessageText(text, extra),
     );
-    await ctx.editMessageText(l.mainMenuPickChannel, {
-      ...Markup.inlineKeyboard(buttons, { columns: 2 }),
-    });
   });
 
   // Workspace picker callback

@@ -6,9 +6,6 @@ export const en = {
   connectedToWorkspace: (name: string) =>
     `✅ Connected to ${name}!\n\nNow add me as admin to the channels or groups you want to sync.\n\nℹ️ No specific permissions needed — just admin status is enough.`,
 
-  alreadyConnected: (workspaceId: string) =>
-    `You're already connected to workspace ${workspaceId}.\n\nUse /sync to sync a channel, or configure custom properties first in /settings.`,
-
   invalidApiKey: "❌ Invalid API key.\n\nDouble-check in <b>Settings &gt; API Keys</b> in @crmchat_crm_bot.",
   apiUnreachable: "⚠️ Couldn't reach CRMChat API. Please try again in a moment.",
   noOrganizations: "No organizations found for this API key.",

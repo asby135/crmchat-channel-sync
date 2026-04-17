@@ -28,9 +28,12 @@ export function buildPromotionMenu(
   );
   const extra = {
     ...Markup.inlineKeyboard([
-      Markup.button.callback(l.syncNowBtn, `sync_now:${ch.channelId}`),
-      Markup.button.callback(l.settingsFirstBtn, `settings_first:${ch.channelId}`),
-      Markup.button.callback(l.notNowBtn, `not_now:${ch.channelId}`),
+      [
+        Markup.button.callback(l.syncNowBtn, `sync_now:${ch.channelId}`),
+        Markup.button.callback(l.settingsFirstBtn, `settings_first:${ch.channelId}`),
+        Markup.button.callback(l.notNowBtn, `not_now:${ch.channelId}`),
+      ],
+      [Markup.button.callback(l.switchWorkspaceBtn, "switch_workspace")],
     ]),
   };
   return { text, extra };
