@@ -3,7 +3,7 @@ import type { Locale } from "./index.js";
 export const ru: Locale = {
   // ── start.ts ──────────────────────────────────────────────────────
   welcome:
-    "Привет! 👋\n\nОтправь мне API-ключ CRMChat, чтобы начать.\n\nНайти его можно в <b>Настройки &gt; API-ключи</b> в @crmchat_crm_bot.\n\nВидео-туториал: https://crmchat.ai/ru/help-center/telegram-channel-crm-sync",
+    'Привет! 👋\n\nОтправь мне API-ключ CRMChat, чтобы начать.\n\nНайти его можно в <b>Настройки &gt; API-ключи</b> в @crmchat_crm_bot.\n\n🎥 <a href="https://crmchat.ai/ru/help-center/telegram-channel-crm-sync">Посмотреть полный видео-туториал</a>',
 
   connectedToWorkspace: (name: string) =>
     `✅ Подключено к ${name}!\n\nТеперь добавь меня админом в каналы или группы, которые хочешь синхронизировать.\n\nℹ️ Особые права не нужны — достаточно статуса админа.`,
