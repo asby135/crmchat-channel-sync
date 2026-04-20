@@ -1,7 +1,7 @@
 export const en = {
   // ── start.ts ──────────────────────────────────────────────────────
   welcome:
-    "Hey! 👋\n\nSend me your CRMChat API key to get started.\n\nFind it in <b>Settings &gt; API Keys</b> in @crmchat_crm_bot.",
+    "Hey! 👋\n\nSend me your CRMChat API key to get started.\n\nFind it in <b>Settings &gt; API Keys</b> in @crmchat_crm_bot.\n\nVideo tutorial: https://crmchat.ai/help-center/telegram-channel-crm-sync",
 
   connectedToWorkspace: (name: string) =>
     `✅ Connected to ${name}!\n\nNow add me as admin to the channels or groups you want to sync.\n\nℹ️ No specific permissions needed — just admin status is enough.`,
