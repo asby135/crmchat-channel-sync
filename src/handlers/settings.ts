@@ -73,7 +73,10 @@ export function formatChannelSettings(ch: ChannelConfig, l: Locale): string {
   return lines.join("\n");
 }
 
-function channelSettingsKeyboard(channelId: number, l: Locale) {
+export function channelSettingsKeyboard(
+  channelId: number,
+  l: Locale,
+): ReturnType<typeof Markup.inlineKeyboard> {
   return Markup.inlineKeyboard([
     [Markup.button.callback(l.settingsBtnSetMapping, `set_mapping:${channelId}`)],
     [Markup.button.callback(l.settingsBtnRemoveMapping, `remove_mapping:${channelId}`)],

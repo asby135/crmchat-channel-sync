@@ -2,7 +2,7 @@ import { Markup, type Telegraf } from "telegraf";
 import type { ConfigStore } from "../config/store.js";
 import { CrmChatClient } from "../api/client.js";
 import { bulkSync, localizeSyncError } from "../handlers/sync.js";
-import { formatChannelSettings } from "../handlers/settings.js";
+import { formatChannelSettings, channelSettingsKeyboard } from "../handlers/settings.js";
 import { findDefaultStageMapping } from "../lib/default-mapping.js";
 import { buildPromotionMenu } from "../lib/promotion-menu.js";
 import type { ChannelConfig, PropertyMapping } from "../config/types.js";
@@ -283,13 +283,7 @@ export function registerMyChatMemberListener(
     }
 
     await ctx.editMessageText(formatChannelSettings(ch, l), {
-      ...Markup.inlineKeyboard([
-        [
-          Markup.button.callback(l.settingsBtnSetMapping, `set_mapping:${channelId}`),
-          Markup.button.callback(l.settingsBtnRemoveMapping, `remove_mapping:${channelId}`),
-        ],
-        [Markup.button.callback(l.settingsBtnBack, "settings_back")],
-      ]),
+      ...channelSettingsKeyboard(channelId, l),
     });
   });
 
