@@ -68,6 +68,7 @@ export function createSession(
     organizationId,
     authenticatedAt: new Date().toISOString(),
   });
+  config.incrementStat("workspace_connected");
   console.log("[start] Session created for workspace:", workspace.name);
 }
 
@@ -183,6 +184,7 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
     const payload = ctx.startPayload?.trim();
     const lang = ctx.from?.language_code;
     const l = t(lang);
+    config.incrementStat("bot_started");
 
     // Flow A: deep link with API key
     if (payload && payload.startsWith("sk_")) {

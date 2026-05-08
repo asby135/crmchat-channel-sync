@@ -27,7 +27,16 @@ export interface SessionData {
   authenticatedAt: string;     // ISO date
 }
 
+export type StatEvent =
+  | "bot_started"
+  | "workspace_connected"
+  | "channel_connected"
+  | "sync_completed";
+
+export type DailyStats = Partial<Record<StatEvent, number>>;
+
 export interface BotConfig {
   channels: Record<string, ChannelConfig>;  // keyed by channelId as string
   sessions: Record<string, SessionData>;    // keyed by Telegram chat ID (user DM)
+  stats?: Record<string, DailyStats>;       // keyed by YYYY-MM-DD UTC
 }

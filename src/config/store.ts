@@ -1,6 +1,12 @@
 import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { BotConfig, ChannelConfig, SessionData } from "./types.js";
+import type {
+  BotConfig,
+  ChannelConfig,
+  SessionData,
+  StatEvent,
+  DailyStats,
+} from "./types.js";
 
 export class ConfigStore {
   private filePath: string;
@@ -9,7 +15,7 @@ export class ConfigStore {
 
   constructor(filePath?: string) {
     this.filePath = filePath ?? process.env.CONFIG_PATH ?? "./data/config.json";
-    this.config = { channels: {}, sessions: {} };
+    this.config = { channels: {}, sessions: {}, stats: {} };
   }
 
   /** Await any in-flight save (useful for tests). */
@@ -34,7 +40,7 @@ export class ConfigStore {
         );
       }
       // File doesn't exist or is corrupted — start fresh
-      this.config = { channels: {}, sessions: {} };
+      this.config = { channels: {}, sessions: {}, stats: {} };
     }
   }
 
@@ -95,4 +101,46 @@ export class ConfigStore {
       (c) => c.workspaceId === workspaceId
     );
   }
+
+  // --- Stats (per-day counters keyed by YYYY-MM-DD UTC) ---
+
+  /** Increment the counter for `event` on today's UTC date. */
+  incrementStat(event: StatEvent, now: Date = new Date()): void {
+    const key = isoDate(now);
+    if (!this.config.stats) this.config.stats = {};
+    const day = this.config.stats[key] ?? {};
+    day[event] = (day[event] ?? 0) + 1;
+    this.config.stats[key] = day;
+    this.enqueueSave();
+  }
+
+  /**
+   * Sum each stat over the trailing `days` UTC days, ending at `now` (inclusive).
+   * `days = 7` returns the rolling week including today.
+   */
+  rollupStats(days: number, now: Date = new Date()): Record<StatEvent, number> {
+    const out: Record<StatEvent, number> = {
+      bot_started: 0,
+      workspace_connected: 0,
+      channel_connected: 0,
+      sync_completed: 0,
+    };
+    const stats = this.config.stats ?? {};
+    for (let i = 0; i < days; i++) {
+      const d = new Date(now);
+      d.setUTCDate(d.getUTCDate() - i);
+      const day = stats[isoDate(d)];
+      if (!day) continue;
+      for (const k of Object.keys(out) as StatEvent[]) {
+        out[k] += day[k] ?? 0;
+      }
+    }
+    return out;
+  }
 }
+
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+// Re-export for tests / consumers that only import from store.
+export type { DailyStats };

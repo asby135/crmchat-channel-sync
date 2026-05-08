@@ -450,6 +450,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
         lastSyncAt: new Date().toISOString(),
         subscriberCount: result.total,
       });
+      config.incrementStat("sync_completed");
     } catch (err) {
       syncErr = err;
       console.error(`[sync] Error syncing channel ${channelId}:`, err);

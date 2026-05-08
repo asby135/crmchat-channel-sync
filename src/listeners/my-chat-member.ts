@@ -100,6 +100,7 @@ export function registerMyChatMemberListener(
         addedAt: new Date().toISOString(),
       };
       config.setChannelConfig(channelId, channelConfig);
+      config.incrementStat("channel_connected");
 
       const { text, extra } = buildPromotionMenu(channelConfig, workspaceName, l);
       await ctx.telegram.sendMessage(from.id, text, extra);

@@ -4,6 +4,7 @@ import { ConfigStore } from "./config/store.js";
 import { registerStartHandler } from "./handlers/start.js";
 import { registerSyncHandler } from "./handlers/sync.js";
 import { registerSettingsHandler } from "./handlers/settings.js";
+import { registerAdminHandler } from "./handlers/admin.js";
 import { registerMyChatMemberListener } from "./listeners/my-chat-member.js";
 import { registerChatMemberListener } from "./listeners/chat-member.js";
 
@@ -46,6 +47,7 @@ async function main() {
   registerStartHandler(bot, config);
   registerSyncHandler(bot, config);
   registerSettingsHandler(bot, config);
+  registerAdminHandler(bot, config);
   registerMyChatMemberListener(bot, config);
   registerChatMemberListener(bot, config);
 
