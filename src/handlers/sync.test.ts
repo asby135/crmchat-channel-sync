@@ -345,4 +345,26 @@ describe("bulkSync", () => {
     const body = JSON.parse(createCall[1].body);
     expect(body.custom).toEqual({ stage: "subscriber" });
   });
+
+  it("uses channelParticipantsSearch filter so megagroups can paginate past 200 (regression)", async () => {
+    // channels.getParticipants with `channelParticipantsRecent` is server-capped
+    // at ~200 results regardless of offset. Using `channelParticipantsSearch`
+    // with empty q is the full-enumeration pattern. Lock in the filter choice
+    // so it can't silently drift back.
+    fetchSpy
+      .mockResolvedValueOnce(jsonResponse(singlePage([])))                  // listProperties
+      .mockResolvedValueOnce(jsonResponse(singlePage([])))                  // listContacts
+      .mockResolvedValueOnce(jsonResponse(makeParticipantsResponse([       // MTProto
+        { id: 1, firstName: "Solo", username: "solo" },
+      ])))
+      .mockResolvedValueOnce(jsonResponse({ data: makeContact(1, "Solo") })); // createContact
+
+    const client = new CrmChatClient("sk_test");
+    await bulkSync({ ...defaultOptions, client });
+
+    // Third fetch call (index 2) is the MTProto getParticipants invocation.
+    const mtprotoCall = fetchSpy.mock.calls[2];
+    const body = JSON.parse(mtprotoCall[1].body);
+    expect(body.params.filter).toEqual({ _: "channelParticipantsSearch", q: "" });
+  });
 });

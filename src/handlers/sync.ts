@@ -170,7 +170,16 @@ export async function bulkSync(options: {
     }
   }
 
-  // 2. FETCH SUBSCRIBERS via MTProto pagination
+  // 2. FETCH SUBSCRIBERS via MTProto pagination.
+  //
+  // Filter choice matters: `channelParticipantsRecent` is server-capped at ~200
+  // results total regardless of pagination — same cap admins see in Telegram's
+  // own "Subscribers" tab on a broadcast channel. Using `channelParticipantsSearch`
+  // with an empty query is the canonical full-enumeration pattern (Telethon,
+  // MadelineProto, GramJS all do this). For megagroups it unlocks up to ~10K
+  // members per chain. For broadcast channels Telegram still policy-caps admin
+  // visibility around 200, so this won't magically bypass that limit — but it's
+  // the right filter and at least removes the client-side limitation.
   console.log(`[bulkSync] Fetching channel participants via MTProto...`);
   const allParticipants: TelegramParticipant[] = [];
   const allUsers: TelegramUser[] = [];
@@ -185,7 +194,7 @@ export async function bulkSync(options: {
         "channels.getParticipants",
         {
           channel: { _: "inputChannel", channelId: toMtprotoChannelId(channelId), accessHash },
-          filter: { _: "channelParticipantsRecent" },
+          filter: { _: "channelParticipantsSearch", q: "" },
           offset,
           limit,
           hash: "0",
