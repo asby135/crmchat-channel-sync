@@ -41,6 +41,9 @@ export const en = {
   syncCheckCrm:
     "\nView your contacts in @crmchat_crm_bot.\n\n💡 New subscribers will sync automatically based on your /settings.",
 
+  syncBroadcastCapNote:
+    "\nℹ️ Telegram caps admin-visible subscribers on broadcast channels at ~200. Existing members beyond that limit can't be back-filled. <b>New joins and leaves after this point are tracked automatically with no cap.</b>",
+
   syncAlreadySynced: (title: string, count: number) =>
     `${title} is already synced (${count} subscribers).\n\nNew subscribers sync automatically based on your /settings — no need to re-sync.`,
 

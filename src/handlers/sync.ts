@@ -358,8 +358,13 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
 
     // Prevent accidental re-sync: offer force button instead
     if (channelConfig.lastSyncAt && !ctx.match[0].startsWith("force_sync_channel:")) {
+      const alreadyText = l.syncAlreadySynced(
+        channelConfig.channelTitle,
+        channelConfig.subscriberCount ?? 0,
+      );
+      const hitBroadcastCap = channelConfig.subscriberCount === 200;
       await ctx.editMessageText(
-        l.syncAlreadySynced(channelConfig.channelTitle, channelConfig.subscriberCount ?? 0),
+        hitBroadcastCap ? `${alreadyText}\n${l.syncBroadcastCapNote}` : alreadyText,
         { ...Markup.inlineKeyboard([
           Markup.button.callback(l.syncForceButton, `force_sync_channel:${channelId}`),
         ]) },
@@ -474,6 +479,12 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
     try {
       if (result) {
         const wasStopped = abortController.signal.aborted;
+        // total === 200 is the tell-tale signature of hitting the Telegram
+        // broadcast-channel admin-visibility cap: our pagination loop returns
+        // exactly the first page and then nothing. Surface the note so the
+        // user knows it's a Telegram policy limit, not a sync failure, and
+        // that ongoing chat_member tracking is unaffected.
+        const hitBroadcastCap = !wasStopped && result.total === 200;
         const completionText = [
           wasStopped ? l.syncStopped(channelTitle) : l.syncComplete(channelTitle),
           l.syncNewContacts(result.created),
@@ -481,6 +492,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
           l.syncPrivate(result.private),
           l.syncFailedCount(result.failed),
           l.syncCheckCrm,
+          ...(hitBroadcastCap ? [l.syncBroadcastCapNote] : []),
         ].join("\n");
         await ctx.telegram.editMessageText(
           chatId,
