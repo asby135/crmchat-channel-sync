@@ -53,6 +53,37 @@ export const en = {
   syncErrNoActiveTgAccount:
     "No active Telegram account found in your workspace.\n\nTo sync channels, you need at least one Telegram account connected. Open @crmchat_crm_bot &gt; <b>Telegram accounts</b> and connect your personal Telegram. It's free and only takes a minute.\n\n⚠️ Important: the connected account must be an <b>admin</b> of the channels you want to sync (typically your own account if you own the channel).\n\nThen come back and try /sync again.",
 
+  // ── error explanations (lib/api-errors.ts) ────────────────────────
+
+  errChannelNotVisible:
+    "The connected Telegram account can't see this channel.\n\nUsually this means the account never joined it, or joined from a different Telegram account than the one connected to CRMChat.\n\n<b>What to do:</b>\n1. Open @crmchat_crm_bot &gt; <b>Telegram accounts</b> and check which account is connected.\n2. Make sure that exact account is a member of the channel.\n3. Promote it to <b>admin</b> in the channel settings.\n4. Try syncing again.",
+
+  errChannelPrivate:
+    "The connected Telegram account isn't a member of this channel any more.\n\nIt was either removed, or it left.\n\n<b>What to do:</b> add the account back to the channel, make it an <b>admin</b>, then try syncing again.",
+
+  errAdminRequired:
+    "The connected Telegram account is in this channel, but it isn't an admin.\n\nTelegram only reveals the subscriber list to admins.\n\n<b>What to do:</b> open the channel &gt; <b>Administrators</b> &gt; <b>Add admin</b> and promote the connected account. No specific permissions needed — plain admin status is enough. Then try syncing again.",
+
+  errAccountDisconnected:
+    "The Telegram account connected to CRMChat is no longer signed in.\n\nThis happens when the session is ended from Telegram's <b>Devices</b> screen, or the account is deactivated.\n\n<b>What to do:</b> open @crmchat_crm_bot &gt; <b>Telegram accounts</b> and reconnect it, then try syncing again.",
+
+  errTelegramUnavailable:
+    "Telegram is temporarily unavailable for the connected account.\n\nNothing is broken on your side. Try again in a few minutes.",
+
+  errFloodWait: (seconds: number) =>
+    `Telegram is rate-limiting the connected account and asked us to wait ${seconds} seconds.\n\nThis happens after a lot of activity in a short window. Wait it out and try syncing again — nothing is lost.`,
+
+  errApiKeyInvalid:
+    "Your CRMChat API key was rejected.\n\nIt may have been revoked or regenerated.\n\n<b>What to do:</b> grab a fresh key from <b>Settings &gt; API Keys</b> in @crmchat_crm_bot and send /start to reconnect.",
+
+  errRateLimited: (seconds: number) =>
+    `CRMChat is rate-limiting requests. Try again in ${seconds} seconds.`,
+
+  errOwnerRequired:
+    "Your CRMChat workspace marks <b>Owner</b> as a required field on contacts, and the sync couldn't work out who to assign them to.\n\n<b>What to do:</b> make sure your workspace has at least one member, or make the Owner field optional in your CRMChat contact settings. Then try syncing again.",
+
+  errTechnicalCode: (code: string) => `<i>Technical detail: ${code}</i>`,
+
   syncForceButton: "🔄 Force re-sync",
   syncStopBtn: "⏹ Stop sync",
   syncStopped: (title: string) => `⏹ Sync stopped for ${title}.`,
@@ -159,7 +190,7 @@ export const en = {
     "Session expired. Reconnect with /start first.",
 
   syncNowResolveFailed: (reason: string) =>
-    `❌ Couldn't resolve channel.\n\n${reason}\n\n⚠️ Note: the connected Telegram account must be an <b>admin</b> of the channel you want to sync.`,
+    `❌ Couldn't resolve channel.\n\n${reason}`,
 
   notNowMsg: "No problem! You can sync anytime with /sync.",
 
