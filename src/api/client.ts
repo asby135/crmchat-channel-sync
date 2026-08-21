@@ -6,6 +6,7 @@ import type {
   TelegramAccount,
   Contact,
   Property,
+  WorkspaceMember,
   CreateContactInput,
   TelegramRawResponse,
 } from "./types.js";
@@ -61,6 +62,17 @@ export class CrmChatClient {
     return this.paginateAll<Workspace>(
       `/workspaces?organizationId=${encodeURIComponent(organizationId)}`,
     );
+  }
+
+  /**
+   * Workspace members. Note: this endpoint returns a bare `{ data: [...] }`
+   * object with no pagination envelope, so it cannot go through paginateAll.
+   */
+  async listWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
+    const res = await this.request<{ data: WorkspaceMember[] }>(
+      `/workspaces/${workspaceId}/members`,
+    );
+    return res.data;
   }
 
   // ── Telegram accounts ──────────────────────────────────────────────

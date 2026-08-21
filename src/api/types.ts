@@ -45,6 +45,19 @@ export interface Contact {
   custom?: Record<string, unknown>;
 }
 
+export type WorkspaceRole = "admin" | "member" | "chatter";
+
+export interface WorkspaceMember {
+  userId: string;
+  role: WorkspaceRole;
+  user: {
+    name: string;
+    avatarUrl?: string;
+    timezone?: string;
+    telegramUsername?: string;
+  };
+}
+
 export interface Property {
   key: string;
   name: string;
@@ -53,7 +66,13 @@ export interface Property {
   options?: Array<{ label: string; value: string }>;
 }
 
-// Contact creation input (ownerId is optional, API defaults to authenticated user)
+// Contact creation input.
+//
+// ownerId is optional in the API contract ("defaults to the authenticated
+// user"), but that default is applied AFTER property validation. When a
+// workspace marks the `ownerId` property required, the API injects a null and
+// rejects the create before its own default runs. See resolveOwnerId() in
+// src/lib/resolve-owner.ts — we send ownerId explicitly in that case.
 export interface CreateContactInput {
   fullName: string;
   ownerId?: string;
