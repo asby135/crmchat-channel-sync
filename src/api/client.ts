@@ -41,6 +41,83 @@ export class RateLimitError extends ApiError {
   }
 }
 
+// ── Error message extraction ───────────────────────────────────────────
+
+/** Cap detail length so a large body can't flood a Telegram message. */
+const MAX_ERROR_DETAIL = 300;
+
+function truncate(text: string): string {
+  return text.length > MAX_ERROR_DETAIL
+    ? `${text.slice(0, MAX_ERROR_DETAIL - 1)}\u2026`
+    : text;
+}
+
+function formatIssues(issues: unknown): string | undefined {
+  if (!Array.isArray(issues)) return undefined;
+  const parts: string[] = [];
+  for (const issue of issues) {
+    if (typeof issue !== "object" || issue === null) continue;
+    const { path, message } = issue as { path?: unknown; message?: unknown };
+    if (typeof message !== "string") continue;
+    // `path` is an array from zod, a plain string from the property validator.
+    const where = Array.isArray(path) ? path.join(".") : typeof path === "string" ? path : "";
+    parts.push(where ? `${where}: ${message}` : message);
+  }
+  return parts.length > 0 ? parts.join("; ") : undefined;
+}
+
+/**
+ * Pull the useful text out of an error body.
+ *
+ * The API wraps Telegram RPC errors as HTTP 400 with the raw MTProto text in
+ * `message` (CHANNEL_INVALID, CHAT_ADMIN_REQUIRED, FLOOD_WAIT_42, ...), and
+ * property validation failures as a generic message plus a `data.issues` list.
+ * Both are far more useful than the bare "Bad Request" status text.
+ */
+export function extractErrorDetail(body?: string): string | undefined {
+  if (!body) return undefined;
+  const trimmed = body.trim();
+  if (!trimmed) return undefined;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    // Non-JSON body: usable if it's short prose, useless if it's an HTML page.
+    if (trimmed.startsWith("<")) return undefined;
+    return truncate(trimmed);
+  }
+
+  if (typeof parsed !== "object" || parsed === null) return undefined;
+  const { message, code, data } = parsed as {
+    message?: unknown;
+    code?: unknown;
+    data?: unknown;
+  };
+
+  const issues =
+    typeof data === "object" && data !== null
+      ? formatIssues((data as { issues?: unknown }).issues)
+      : undefined;
+
+  const base = typeof message === "string" && message ? message : undefined;
+  if (base && issues) return truncate(`${base} (${issues})`);
+  if (base) return truncate(base);
+  if (issues) return truncate(issues);
+  if (typeof code === "string" && code) return truncate(code);
+  return undefined;
+}
+
+/** Build an error message that keeps the server's own explanation. */
+export function describeApiError(
+  status: number,
+  statusText: string,
+  body?: string,
+): string {
+  const detail = extractErrorDetail(body);
+  return `API error ${status}: ${detail ?? statusText}`;
+}
+
 // ── Client ─────────────────────────────────────────────────────────────
 
 export class CrmChatClient {
@@ -183,7 +260,7 @@ export class CrmChatClient {
         throw new RateLimitError(retryAfter, body);
       }
       throw new ApiError(
-        `API error ${res.status}: ${res.statusText}`,
+        describeApiError(res.status, res.statusText, body),
         res.status,
         body,
       );

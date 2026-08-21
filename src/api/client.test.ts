@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { CrmChatClient, ApiAuthError, RateLimitError, ApiError } from "./client.js";
+import {
+  CrmChatClient,
+  ApiAuthError,
+  RateLimitError,
+  ApiError,
+  extractErrorDetail,
+  describeApiError,
+} from "./client.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -203,5 +210,107 @@ describe("CrmChatClient", () => {
         params: { q: "test" },
       });
     });
+  });
+});
+
+// ── Error detail ─────────────────────────────────────────────────────
+
+describe("extractErrorDetail", () => {
+  it("surfaces the raw Telegram RPC error text", () => {
+    // dc-proxy wraps tl.RpcError as BAD_REQUEST with message = err.text
+    const body = JSON.stringify({
+      defined: true,
+      code: "BAD_REQUEST",
+      status: 400,
+      message: "CHANNEL_INVALID",
+      data: { code: "TELEGRAM_RPC_ERROR", tlErrorCode: 400, tlErrorMessage: "CHANNEL_INVALID" },
+    });
+
+    expect(extractErrorDetail(body)).toBe("CHANNEL_INVALID");
+  });
+
+  it("keeps FLOOD_WAIT_N intact so flood retry can parse it", () => {
+    // withFloodRetry in handlers/sync.ts matches this regex against err.message.
+    // Before the body was surfaced, MTProto flood waits arrived as a bare
+    // "Bad Request" and the retry never fired.
+    const body = JSON.stringify({ code: "BAD_REQUEST", message: "FLOOD_WAIT_42" });
+
+    const message = describeApiError(400, "Bad Request", body);
+
+    expect(message.match(/FLOOD_WAIT_(\d+)/)?.[1]).toBe("42");
+  });
+
+  it("appends validation issues to the message", () => {
+    const body = JSON.stringify({
+      code: "BAD_REQUEST",
+      message: "Input validation failed",
+      data: { issues: [{ path: ["ownerId"], message: "Property is required" }] },
+    });
+
+    expect(extractErrorDetail(body)).toBe(
+      "Input validation failed (ownerId: Property is required)",
+    );
+  });
+
+  it("handles a string path from the property validator", () => {
+    const body = JSON.stringify({
+      message: "Input validation failed",
+      data: { issues: [{ path: "custom.stage", message: "Invalid option" }] },
+    });
+
+    expect(extractErrorDetail(body)).toBe(
+      "Input validation failed (custom.stage: Invalid option)",
+    );
+  });
+
+  it("falls back to the code when there is no message", () => {
+    expect(extractErrorDetail(JSON.stringify({ code: "FORBIDDEN" }))).toBe("FORBIDDEN");
+  });
+
+  it("ignores an HTML error page", () => {
+    expect(extractErrorDetail("<html><body>502 Bad Gateway</body></html>")).toBeUndefined();
+  });
+
+  it("passes through short non-JSON text", () => {
+    expect(extractErrorDetail("upstream timeout")).toBe("upstream timeout");
+  });
+
+  it("truncates a long body", () => {
+    const detail = extractErrorDetail(JSON.stringify({ message: "x".repeat(500) }));
+    expect(detail).toHaveLength(300);
+    expect(detail?.endsWith("\u2026")).toBe(true);
+  });
+
+  it("returns undefined for an empty or missing body", () => {
+    expect(extractErrorDetail(undefined)).toBeUndefined();
+    expect(extractErrorDetail("   ")).toBeUndefined();
+  });
+});
+
+describe("describeApiError", () => {
+  it("uses the server explanation when there is one", () => {
+    const body = JSON.stringify({ message: "CHAT_ADMIN_REQUIRED" });
+    expect(describeApiError(400, "Bad Request", body)).toBe(
+      "API error 400: CHAT_ADMIN_REQUIRED",
+    );
+  });
+
+  it("falls back to the status text when the body says nothing", () => {
+    expect(describeApiError(500, "Internal Server Error")).toBe(
+      "API error 500: Internal Server Error",
+    );
+  });
+});
+
+describe("request error messages", () => {
+  it("puts the Telegram error into the thrown ApiError message", async () => {
+    const body = JSON.stringify({ code: "BAD_REQUEST", message: "CHANNEL_INVALID" });
+    fetchSpy.mockResolvedValueOnce(
+      new Response(body, { status: 400, statusText: "Bad Request" }),
+    );
+
+    await expect(client.listContacts("ws1")).rejects.toThrow(
+      "API error 400: CHANNEL_INVALID",
+    );
   });
 });
