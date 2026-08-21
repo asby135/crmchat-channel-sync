@@ -20,3 +20,9 @@
 - **Effort:** S (human: ~1 hour / CC: ~10 min)
 - **Repo:** `CRMChat Main/crm` (not this one)
 - **Context:** The bot ships a workaround in `src/lib/resolve-owner.ts` that sends an explicit ownerId picked from workspace members. That workaround can be deleted once the API validates before applying its own defaults. The bot cannot reproduce the API's intended default (owner = authenticated user) because there is still no `/me` endpoint for API-key clients.
+
+## P2: Escape user-controlled text interpolated into HTML messages
+- **What:** `index.ts` sets `parse_mode: "HTML"` on every outgoing message, and i18n strings interpolate channel titles and contact names directly (17 call sites in `src/i18n/en.ts` alone). Nothing is escaped. A channel named `Маркетинг & Продажи` or `A <> B` produces invalid HTML and Telegram rejects the send with "can't parse entities".
+- **Why:** The customer sees nothing at all — not a broken message, no message. It hits hardest on error paths, where the message is the only thing telling them what to fix.
+- **Effort:** S (human: ~2 hours / CC: ~15 min)
+- **Context:** Pre-existing, spotted while localizing error messages 2026-08-21. Fix is an `escapeHtml` helper applied to interpolated values at the i18n boundary, plus a test with a title containing `&` and `<`.
