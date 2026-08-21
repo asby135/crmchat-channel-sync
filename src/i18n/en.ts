@@ -56,31 +56,31 @@ export const en = {
   // ── error explanations (lib/api-errors.ts) ────────────────────────
 
   errChannelNotVisible:
-    "The connected Telegram account can't see this channel.\n\nUsually this means the account never joined it, or joined from a different Telegram account than the one connected to CRMChat.\n\n<b>What to do:</b>\n1. Open @crmchat_crm_bot &gt; <b>Telegram accounts</b> and check which account is connected.\n2. Make sure that exact account is a member of the channel.\n3. Promote it to <b>admin</b> in the channel settings.\n4. Try syncing again.",
+    "The connected Telegram account can't see this channel.\n\nMake sure the account that's an admin of the channel/group is the one connected in CRMChat under <b>Telegram accounts</b>.",
 
   errChannelPrivate:
-    "The connected Telegram account isn't a member of this channel any more.\n\nIt was either removed, or it left.\n\n<b>What to do:</b> add the account back to the channel, make it an <b>admin</b>, then try syncing again.",
+    "The connected Telegram account isn't in this channel any more.\n\nAdd it back and make it an admin.",
 
   errAdminRequired:
-    "The connected Telegram account is in this channel, but it isn't an admin.\n\nTelegram only reveals the subscriber list to admins.\n\n<b>What to do:</b> open the channel &gt; <b>Administrators</b> &gt; <b>Add admin</b> and promote the connected account. No specific permissions needed — plain admin status is enough. Then try syncing again.",
+    "The connected Telegram account isn't an admin of this channel.\n\nMake it an admin in the channel settings — no specific permissions needed.",
 
   errAccountDisconnected:
-    "The Telegram account connected to CRMChat is no longer signed in.\n\nThis happens when the session is ended from Telegram's <b>Devices</b> screen, or the account is deactivated.\n\n<b>What to do:</b> open @crmchat_crm_bot &gt; <b>Telegram accounts</b> and reconnect it, then try syncing again.",
+    "The Telegram account is no longer connected to CRMChat.\n\nReconnect it in @crmchat_crm_bot &gt; <b>Telegram accounts</b>.",
 
   errTelegramUnavailable:
-    "Telegram is temporarily unavailable for the connected account.\n\nNothing is broken on your side. Try again in a few minutes.",
+    "Telegram is temporarily unavailable. Try again in a few minutes.",
 
   errFloodWait: (seconds: number) =>
-    `Telegram is rate-limiting the connected account and asked us to wait ${seconds} seconds.\n\nThis happens after a lot of activity in a short window. Wait it out and try syncing again — nothing is lost.`,
+    `Telegram asked us to wait ${seconds} seconds. Try again after that.`,
 
   errApiKeyInvalid:
-    "Your CRMChat API key was rejected.\n\nIt may have been revoked or regenerated.\n\n<b>What to do:</b> grab a fresh key from <b>Settings &gt; API Keys</b> in @crmchat_crm_bot and send /start to reconnect.",
+    "Your CRMChat API key was rejected.\n\nGet a new one in <b>Settings &gt; API Keys</b> and send /start.",
 
   errRateLimited: (seconds: number) =>
-    `CRMChat is rate-limiting requests. Try again in ${seconds} seconds.`,
+    `Too many requests. Try again in ${seconds} seconds.`,
 
   errOwnerRequired:
-    "Your CRMChat workspace marks <b>Owner</b> as a required field on contacts, and the sync couldn't work out who to assign them to.\n\n<b>What to do:</b> make sure your workspace has at least one member, or make the Owner field optional in your CRMChat contact settings. Then try syncing again.",
+    "<b>Owner</b> is a required field on contacts in your CRMChat workspace, and the sync couldn't tell who to assign them to.\n\nAdd a member to the workspace, or make Owner optional.",
 
   errTechnicalCode: (code: string) => `<i>Technical detail: ${code}</i>`,
 

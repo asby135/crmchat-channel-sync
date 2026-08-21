@@ -89,7 +89,7 @@ describe("localizeBotError", () => {
     const text = localizeBotError(telegramError("CHAT_ADMIN_REQUIRED"), en);
 
     expect(text).toContain("isn't an admin");
-    expect(text).toContain("Administrators");
+    expect(text).toContain("Make it an admin");
     expect(text).not.toContain("API error 400");
   });
 
@@ -97,7 +97,28 @@ describe("localizeBotError", () => {
     const text = localizeBotError(telegramError("CHAT_ADMIN_REQUIRED"), ru);
 
     expect(text).toContain("не админ");
-    expect(text).toContain("Администраторы");
+    expect(text).toContain("Назначь его админом");
+  });
+
+  // The whole point of the rewrite: a channel owner should read one screen,
+  // not a numbered procedure. Guards against explanations creeping back up.
+  it("keeps every explanation short", () => {
+    const samples = [
+      telegramError("CHANNEL_INVALID"),
+      telegramError("CHANNEL_PRIVATE"),
+      telegramError("CHAT_ADMIN_REQUIRED"),
+      telegramError("AUTH_KEY_UNREGISTERED"),
+      telegramError("TIMEOUT"),
+      telegramError("FLOOD_WAIT_5"),
+      new ApiAuthError(),
+      new RateLimitError(30),
+    ];
+
+    for (const locale of [en, ru]) {
+      for (const err of samples) {
+        expect(localizeBotError(err, locale).length).toBeLessThan(280);
+      }
+    }
   });
 
   it("keeps the technical code for support", () => {
