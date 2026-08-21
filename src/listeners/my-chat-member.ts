@@ -1,7 +1,8 @@
 import { Markup, type Telegraf } from "telegraf";
 import type { ConfigStore } from "../config/store.js";
 import { CrmChatClient } from "../api/client.js";
-import { bulkSync, localizeSyncError } from "../handlers/sync.js";
+import { bulkSync } from "../handlers/sync.js";
+import { localizeBotError } from "../lib/api-errors.js";
 import { formatChannelSettings, channelSettingsKeyboard } from "../handlers/settings.js";
 import { findDefaultStageMapping } from "../lib/default-mapping.js";
 import { buildPromotionMenu } from "../lib/promotion-menu.js";
@@ -153,12 +154,12 @@ export function registerMyChatMemberListener(
       accessHash = resolved.accessHash;
     } catch (err) {
       await ctx.answerCbQuery();
-      // Show helpful message for known errors, raw reason for unknown ones
+      // Every error now carries its own explanation and next step.
       const errMsg = err instanceof Error ? err.message : "Unknown error";
       const text =
         errMsg === "NO_ACTIVE_TG_ACCOUNT"
-          ? localizeSyncError(err, l)
-          : l.syncNowResolveFailed(errMsg);
+          ? localizeBotError(err, l)
+          : l.syncNowResolveFailed(localizeBotError(err, l));
       await ctx.editMessageText(text);
       return;
     }
@@ -254,7 +255,7 @@ export function registerMyChatMemberListener(
       }
     } catch (err) {
       console.error(`[sync_now] Error syncing channel ${channelId}:`, err);
-      const errorText = l.syncFailed(channelTitle, err instanceof Error ? err.message : "Unknown error");
+      const errorText = l.syncFailed(channelTitle, localizeBotError(err, l));
       if (msgId) {
         try {
           await ctx.telegram.editMessageText(

@@ -5,6 +5,7 @@ import type { ConfigStore } from "../config/store.js";
 import type { PropertyMapping } from "../config/types.js";
 import { sleep } from "../lib/rate-limiter.js";
 import { resolveOwnerIdIfRequired } from "../lib/resolve-owner.js";
+import { localizeBotError } from "../lib/api-errors.js";
 import { toMtprotoChannelId } from "../lib/telegram.js";
 import { resolveAccountAndAccessHash } from "../lib/resolve-channel.js";
 import { t } from "../i18n/index.js";
@@ -77,15 +78,6 @@ interface ChannelParticipantsResult {
   count: number;
   participants: TelegramParticipant[];
   users: TelegramUser[];
-}
-
-// ── Error localization ───────────────────────────────────────────────
-
-export function localizeSyncError(err: unknown, l: ReturnType<typeof t>): string {
-  const msg = err instanceof Error ? err.message : "Unknown error";
-  if (msg === "NO_ACTIVE_TG_ACCOUNT") return l.syncErrNoActiveTgAccount;
-  // For unknown errors, append the admin note since it's the most common cause
-  return `${msg}\n\n${l.syncErrAdminNote}`;
 }
 
 // ── Pure helpers ──────────────────────────────────────────────────────
@@ -402,7 +394,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
         });
       } catch (err) {
         await ctx.editMessageText(
-          l.syncFailed(channelTitle, localizeSyncError(err, l)),
+          l.syncFailed(channelTitle, localizeBotError(err, l)),
         );
         return;
       }
@@ -510,7 +502,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
           { reply_markup: { inline_keyboard: [] } },
         );
       } else {
-        const errorText = l.syncFailed(channelTitle, localizeSyncError(syncErr, l));
+        const errorText = l.syncFailed(channelTitle, localizeBotError(syncErr, l));
         await ctx.telegram.editMessageText(
           chatId,
           msgId,
