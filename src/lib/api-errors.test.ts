@@ -112,6 +112,7 @@ describe("localizeBotError", () => {
       telegramError("FLOOD_WAIT_5"),
       new ApiAuthError(),
       new RateLimitError(30),
+      new Error("NO_ACTIVE_TG_ACCOUNT"),
     ];
 
     for (const locale of [en, ru]) {

@@ -51,7 +51,7 @@ export const en = {
     "⚠️ Note: the connected Telegram account must be an <b>admin</b> of the channel you want to sync.",
 
   syncErrNoActiveTgAccount:
-    "No active Telegram account found in your workspace.\n\nTo sync channels, you need at least one Telegram account connected. Open @crmchat_crm_bot &gt; <b>Telegram accounts</b> and connect your personal Telegram. It's free and only takes a minute.\n\n⚠️ Important: the connected account must be an <b>admin</b> of the channels you want to sync (typically your own account if you own the channel).\n\nThen come back and try /sync again.",
+    "No Telegram account is connected to your CRMChat workspace.\n\nConnect the account that's an admin of the channel/group in @crmchat_crm_bot &gt; <b>Telegram accounts</b>, then try /sync again.",
 
   // ── error explanations (lib/api-errors.ts) ────────────────────────
 
