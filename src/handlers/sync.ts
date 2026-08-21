@@ -4,6 +4,7 @@ import type { Contact, CreateContactInput } from "../api/types.js";
 import type { ConfigStore } from "../config/store.js";
 import type { PropertyMapping } from "../config/types.js";
 import { sleep } from "../lib/rate-limiter.js";
+import { resolveOwnerIdIfRequired } from "../lib/resolve-owner.js";
 import { toMtprotoChannelId } from "../lib/telegram.js";
 import { resolveAccountAndAccessHash } from "../lib/resolve-channel.js";
 import { t } from "../i18n/index.js";
@@ -155,6 +156,12 @@ export async function bulkSync(options: {
     }
   }
 
+  // Workspaces that mark Owner required reject creates that omit ownerId.
+  const ownerId = await resolveOwnerIdIfRequired(client, workspaceId, properties);
+  if (ownerId) {
+    console.log(`[bulkSync] Workspace requires ownerId, assigning contacts to ${ownerId}`);
+  }
+
   // 1. BATCH DEDUP: fetch all existing contacts, build Set of telegram IDs
   console.log(`[bulkSync] Fetching existing contacts for dedup...`);
   const existingContacts = await client.listContacts(workspaceId);
@@ -273,6 +280,7 @@ export async function bulkSync(options: {
         username: user.username || undefined,
       },
     };
+    if (ownerId) input.ownerId = ownerId;
 
     // Set required custom property defaults + property mapping
     if (Object.keys(requiredCustomDefaults).length > 0 || propertyMapping) {

@@ -5,6 +5,7 @@ import type { ConfigStore } from "../config/store.js";
 import type { PropertyMapping } from "../config/types.js";
 import { buildFullName } from "../handlers/sync.js";
 import { sleep } from "../lib/rate-limiter.js";
+import { resolveOwnerIdIfRequired } from "../lib/resolve-owner.js";
 
 // ── Exported helper (testable without Telegraf context) ──────────────
 
@@ -90,7 +91,7 @@ interface TelegramUser {
  * defaults and setting the tracked property to `mappedValue` (join or leave
  * value) when a mapping is configured. Returns the full name used, for logging.
  */
-async function createContactForUser(
+export async function createContactForUser(
   client: CrmChatClient,
   workspaceId: string,
   user: TelegramUser,
@@ -115,6 +116,10 @@ async function createContactForUser(
       username: user.username || undefined,
     },
   };
+
+  // Workspaces that mark Owner required reject creates that omit ownerId.
+  const ownerId = await resolveOwnerIdIfRequired(client, workspaceId, properties);
+  if (ownerId) input.ownerId = ownerId;
 
   if (Object.keys(customDefaults).length > 0 || (propertyMapping && mappedValue)) {
     input.custom = { ...customDefaults };
