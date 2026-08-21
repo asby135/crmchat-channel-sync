@@ -46,6 +46,23 @@ describe("CrmChatClient", () => {
     });
   });
 
+  describe("listWorkspaceMembers", () => {
+    it("reads the bare data array (endpoint is not paginated)", async () => {
+      const members = [
+        { userId: "u1", role: "admin", user: { name: "Admin" } },
+        { userId: "u2", role: "member", user: { name: "Member" } },
+      ];
+      fetchSpy.mockResolvedValueOnce(jsonResponse({ data: members }));
+
+      const result = await client.listWorkspaceMembers("ws1");
+
+      expect(result).toEqual(members);
+      expect(fetchSpy).toHaveBeenCalledOnce();
+      const [url] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://api.test.local/v1/workspaces/ws1/members");
+    });
+  });
+
   describe("createContact", () => {
     it("sends POST and returns the created contact", async () => {
       const contact = {
