@@ -6,9 +6,51 @@ import { isInTextInputFlow } from "./settings.js";
 import { t } from "../i18n/index.js";
 import { buildPromotionMenu } from "../lib/promotion-menu.js";
 
-// ── Pending API key cache (for workspace picker flow) ───────────────
+// ── Pending picker cache (for workspace picker flow) ────────────────
 
-const pendingApiKeys = new Map<number, string>();
+// Workspaces are cached with the key so paging doesn't refetch every org.
+const pendingPickers = new Map<number, { apiKey: string; workspaces: Workspace[] }>();
+
+// ── Workspace picker (paginated) ─────────────────────────────────────
+
+/**
+ * Telegram rejects inline keyboards over 100 buttons ("reply markup is too
+ * long"), and an agency-scale API key can see more workspaces than that.
+ * Ten per page plus a three-button nav row stays well under the limit no
+ * matter how many workspaces the key has.
+ */
+export const WORKSPACE_PAGE_SIZE = 10;
+
+export function buildWorkspacePicker(
+  workspaces: Workspace[],
+  page: number,
+  l: ReturnType<typeof t>,
+): { text: string; extra: object; page: number } {
+  const sorted = [...workspaces].sort((a, b) => a.name.localeCompare(b.name));
+  const totalPages = Math.max(1, Math.ceil(sorted.length / WORKSPACE_PAGE_SIZE));
+  const current = Math.min(Math.max(0, page), totalPages - 1);
+
+  const rows = sorted
+    .slice(current * WORKSPACE_PAGE_SIZE, (current + 1) * WORKSPACE_PAGE_SIZE)
+    .map((ws) => [Markup.button.callback(ws.name, `pick_ws:${ws.id}:${ws.organizationId}`)]);
+
+  if (totalPages > 1) {
+    const nav = [];
+    if (current > 0) nav.push(Markup.button.callback("◀️", `ws_page:${current - 1}`));
+    nav.push(Markup.button.callback(l.pickWorkspacePage(current + 1, totalPages), "noop"));
+    if (current < totalPages - 1) {
+      nav.push(Markup.button.callback("▶️", `ws_page:${current + 1}`));
+    }
+    rows.push(nav);
+  }
+
+  const text =
+    totalPages > 1
+      ? `${l.pickWorkspace}\n\n${l.pickWorkspaceCount(sorted.length)}`
+      : l.pickWorkspace;
+
+  return { text, extra: { ...Markup.inlineKeyboard(rows) }, page: current };
+}
 
 // ── Exported helper (testable without Telegraf context) ──────────────
 
@@ -169,13 +211,9 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
     // key can see, even when there's only one. The user asked to confirm
     // the target workspace explicitly so the bot never silently picks the
     // wrong one.
-    pendingApiKeys.set(chatId, apiKey);
-    const buttons = result.workspaces.map((ws) =>
-      Markup.button.callback(ws.name, `pick_ws:${ws.id}:${ws.organizationId}`),
-    );
-    await reply(l.pickWorkspace, {
-      ...Markup.inlineKeyboard(buttons, { columns: 1 }),
-    });
+    pendingPickers.set(chatId, { apiKey, workspaces: result.workspaces });
+    const { text, extra } = buildWorkspacePicker(result.workspaces, 0, l);
+    await reply(text, extra);
   }
 
   // /start command (with or without deep-link payload)
@@ -224,6 +262,26 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
     );
   });
 
+  // Workspace picker page turn
+  bot.action(/^ws_page:(\d+)$/, async (ctx) => {
+    const chatId = ctx.chat?.id;
+    const l = t(ctx.from?.language_code);
+    await ctx.answerCbQuery();
+    if (!chatId) return;
+
+    const pending = pendingPickers.get(chatId);
+    if (!pending) {
+      await ctx.editMessageText(l.settingsSessionExpired);
+      return;
+    }
+
+    const { text, extra } = buildWorkspacePicker(pending.workspaces, Number(ctx.match[1]), l);
+    await ctx.editMessageText(text, extra);
+  });
+
+  // Page indicator button in the picker nav row does nothing
+  bot.action("noop", (ctx) => ctx.answerCbQuery());
+
   // Workspace picker callback
   bot.action(/^pick_ws:(.+):(.+)$/, async (ctx) => {
     const chatId = ctx.chat?.id;
@@ -233,7 +291,7 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
 
     const workspaceId = ctx.match[1];
     const organizationId = ctx.match[2];
-    const apiKey = pendingApiKeys.get(chatId);
+    const apiKey = pendingPickers.get(chatId)?.apiKey;
 
     await ctx.answerCbQuery();
 
@@ -242,7 +300,7 @@ export function registerStartHandler(bot: Telegraf, config: ConfigStore): void {
       return;
     }
 
-    pendingApiKeys.delete(chatId);
+    pendingPickers.delete(chatId);
 
     // Fetch workspace name
     try {

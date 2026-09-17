@@ -197,6 +197,9 @@ export const ru: Locale = {
   notNowMsg: "Без проблем! Синхронизировать можно в любое время через /sync.",
 
   pickWorkspace: "Этот API-ключ имеет доступ к нескольким пространствам.\n\nКакое хочешь подключить?",
+  pickWorkspaceCount: (n: number) => `Доступно пространств: ${n}.`,
+  pickWorkspacePage: (page: number, total: number) => `${page}/${total}`,
+  unexpectedError: "⚠️ Что-то пошло не так. Попробуй ещё раз через минуту.",
 
   switchWorkspaceBtn: "🔄 Подключить другое пространство",
   switchWorkspaceMsg: "Предыдущее пространство отключено.\n\nОтправь новый API-ключ для подключения другого пространства.",

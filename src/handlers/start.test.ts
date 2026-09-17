@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { validateAndCreateSession } from "./start.js";
+import { validateAndCreateSession, buildWorkspacePicker, WORKSPACE_PAGE_SIZE } from "./start.js";
 import { ConfigStore } from "../config/store.js";
+import { t } from "../i18n/index.js";
+import type { Workspace } from "../api/types.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -132,5 +134,97 @@ describe("validateAndCreateSession", () => {
     expect(result).toEqual({
       error: "Could not reach CRMChat API. Please try again.",
     });
+  });
+});
+
+// ── Workspace picker ─────────────────────────────────────────────────
+
+type Button = { text: string; callback_data: string };
+
+function keyboardOf(extra: object): Button[][] {
+  return (extra as { reply_markup: { inline_keyboard: Button[][] } }).reply_markup
+    .inline_keyboard;
+}
+
+function makeWorkspaces(n: number): Workspace[] {
+  // Ids shaped like Firestore auto-ids (20 chars) so callback_data length is realistic.
+  return Array.from({ length: n }, (_, i) => ({
+    id: `ws${String(i).padStart(18, "0")}`,
+    name: `Workspace ${String(i).padStart(3, "0")}`,
+    organizationId: `org${String(i % 7).padStart(17, "0")}`,
+  }));
+}
+
+describe("buildWorkspacePicker", () => {
+  const l = t("en");
+
+  // Regression: an agency API key with >100 workspaces produced one button each,
+  // and Telegram rejected the message with "reply markup is too long".
+  it("stays far under Telegram's 100-button limit for a huge workspace list", () => {
+    const workspaces = makeWorkspaces(150);
+    const pages = Math.ceil(150 / WORKSPACE_PAGE_SIZE);
+
+    for (let page = 0; page < pages; page++) {
+      const buttons = keyboardOf(buildWorkspacePicker(workspaces, page, l).extra).flat();
+      expect(buttons.length).toBeLessThanOrEqual(WORKSPACE_PAGE_SIZE + 3);
+    }
+  });
+
+  it("covers every workspace exactly once across pages", () => {
+    const workspaces = makeWorkspaces(35);
+    const seen = new Set<string>();
+    for (let page = 0; page < 4; page++) {
+      for (const b of keyboardOf(buildWorkspacePicker(workspaces, page, l).extra).flat()) {
+        if (b.callback_data.startsWith("pick_ws:")) seen.add(b.callback_data);
+      }
+    }
+    expect(seen.size).toBe(35);
+  });
+
+  it("shows no nav row when everything fits on one page", () => {
+    const rows = keyboardOf(buildWorkspacePicker(makeWorkspaces(3), 0, l).extra);
+    expect(rows).toHaveLength(3);
+    expect(rows.flat().every((b) => b.callback_data.startsWith("pick_ws:"))).toBe(true);
+  });
+
+  it("omits back on the first page and forward on the last", () => {
+    const workspaces = makeWorkspaces(25);
+
+    const first = keyboardOf(buildWorkspacePicker(workspaces, 0, l).extra).at(-1)!;
+    expect(first.map((b) => b.callback_data)).toEqual(["noop", "ws_page:1"]);
+    expect(first[0].text).toBe("1/3");
+
+    const last = keyboardOf(buildWorkspacePicker(workspaces, 2, l).extra).at(-1)!;
+    expect(last.map((b) => b.callback_data)).toEqual(["ws_page:1", "noop"]);
+  });
+
+  it("clamps an out-of-range page", () => {
+    const result = buildWorkspacePicker(makeWorkspaces(25), 99, l);
+    expect(result.page).toBe(2);
+    expect(buildWorkspacePicker(makeWorkspaces(25), -5, l).page).toBe(0);
+  });
+
+  it("sorts by name and keeps the pick_ws callback format", () => {
+    const workspaces: Workspace[] = [
+      { id: "b", name: "Beta", organizationId: "o1" },
+      { id: "a", name: "Alpha", organizationId: "o2" },
+    ];
+    const buttons = keyboardOf(buildWorkspacePicker(workspaces, 0, l).extra).flat();
+    expect(buttons.map((b) => b.text)).toEqual(["Alpha", "Beta"]);
+    expect(buttons[0].callback_data).toBe("pick_ws:a:o2");
+  });
+
+  it("keeps every callback_data within Telegram's 64-byte limit", () => {
+    const workspaces = makeWorkspaces(150);
+    for (let page = 0; page < 15; page++) {
+      for (const b of keyboardOf(buildWorkspacePicker(workspaces, page, l).extra).flat()) {
+        expect(Buffer.byteLength(b.callback_data)).toBeLessThanOrEqual(64);
+      }
+    }
+  });
+
+  it("mentions the workspace count only when paginated", () => {
+    expect(buildWorkspacePicker(makeWorkspaces(3), 0, l).text).toBe(l.pickWorkspace);
+    expect(buildWorkspacePicker(makeWorkspaces(150), 0, l).text).toContain("150");
   });
 });
