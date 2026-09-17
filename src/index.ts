@@ -7,6 +7,8 @@ import { registerSettingsHandler } from "./handlers/settings.js";
 import { registerAdminHandler } from "./handlers/admin.js";
 import { registerMyChatMemberListener } from "./listeners/my-chat-member.js";
 import { registerChatMemberListener } from "./listeners/chat-member.js";
+import { t } from "./i18n/index.js";
+import { describeErrorForLog, describeUpdateForLog } from "./lib/error-log.js";
 
 const token = process.env.BOT_TOKEN;
 if (!token) throw new Error("BOT_TOKEN required");
@@ -50,6 +52,23 @@ async function main() {
   registerAdminHandler(bot, config);
   registerMyChatMemberListener(bot, config);
   registerChatMemberListener(bot, config);
+
+  // Replaces Telegraf's default handler, which logs the full update — including
+  // an API key the user just pasted. Log identifiers only, and tell the user
+  // something went wrong instead of leaving them with silence.
+  bot.catch(async (err, ctx) => {
+    console.error(
+      `[bot] Unhandled error (${describeUpdateForLog(ctx.update)}):`,
+      describeErrorForLog(err),
+    );
+    // Only reply in DMs: for chat_member updates ctx.chat is the customer's channel.
+    if (ctx.chat?.type !== "private") return;
+    try {
+      await ctx.reply(t(ctx.from?.language_code).unexpectedError);
+    } catch {
+      // Replying failed too; nothing more to do.
+    }
+  });
 
   // Register bot commands menu with Telegram
   await bot.telegram.setMyCommands([
