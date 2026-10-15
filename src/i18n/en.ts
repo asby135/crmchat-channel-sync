@@ -16,7 +16,7 @@ export const en = {
     "You need to connect first.\n\nSend /start to set up your API key.",
 
   syncNoChannels:
-    "No channels connected yet.\n\nAdd me as admin to a Telegram channel or group — I'll appear here automatically.",
+    "No channels connected yet.\n\nAdd me as admin to a Telegram channel or group — I'll appear here automatically.\n\nℹ️ If you added me from a different Telegram account, send your API key from that account too.",
 
   syncPickChannel: "Which channel would you like to sync?",
 
@@ -93,7 +93,7 @@ export const en = {
     "You need to connect first.\n\nSend /start to set up your API key.",
 
   settingsNoChannels:
-    "No channels connected yet.\n\nAdd me as admin to a channel or group first.",
+    "No channels connected yet.\n\nAdd me as admin to a channel or group first.\n\nℹ️ If you added me from a different Telegram account, send your API key from that account too.",
 
   settingsChooseChannel: "Choose a channel to configure:",
 
@@ -204,5 +204,5 @@ export const en = {
 
   mainMenuPickChannel: "Which channel?",
   mainMenuNoChannels: (workspaceName: string) =>
-    `Connected to ${workspaceName}, but no channels yet.\n\nAdd me as admin to a Telegram channel or group to start tracking subscribers.\n\nℹ️ No specific permissions needed — just admin status is enough.`,
+    `Connected to ${workspaceName}, but no channels yet.\n\nAdd me as admin to a Telegram channel or group to start tracking subscribers.\n\nℹ️ No specific permissions needed — just admin status is enough.\n\nℹ️ If you added me from a different Telegram account, send your API key from that account too.`,
 };
