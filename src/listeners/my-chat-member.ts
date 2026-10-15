@@ -33,6 +33,27 @@ export function determineMyChatMemberAction(
   return "ignore";
 }
 
+/**
+ * One line per my_chat_member event, so a stalled setup can be traced from
+ * logs alone: who added or removed the bot, where, and what the bot did about
+ * it. Never includes API keys or message text.
+ */
+export function formatMyChatMemberLog(event: {
+  chatId: number;
+  chatType: string;
+  title: string;
+  fromId: number;
+  oldStatus: string;
+  newStatus: string;
+  result: string;
+}): string {
+  return (
+    `[my_chat_member] chat=${event.chatId} type=${event.chatType} ` +
+    `title=${JSON.stringify(event.title)} from=${event.fromId} ` +
+    `${event.oldStatus}->${event.newStatus} result=${event.result}`
+  );
+}
+
 // ── Listener registration ────────────────────────────────────────────
 
 export function registerMyChatMemberListener(
@@ -46,27 +67,52 @@ export function registerMyChatMemberListener(
     const chatType = chat.type;
 
     const action = determineMyChatMemberAction(oldStatus, newStatus, chatType);
-    if (action === "ignore") return;
 
     const channelId = chat.id;
     const channelTitle = "title" in chat ? chat.title : `Chat ${channelId}`;
     const lang = from.language_code;
     const l = t(lang);
 
+    const log = (result: string) =>
+      console.log(
+        formatMyChatMemberLog({
+          chatId: channelId,
+          chatType,
+          title: channelTitle,
+          fromId: from.id,
+          oldStatus,
+          newStatus,
+          result,
+        }),
+      );
+
+    if (action === "ignore") {
+      log("ignored");
+      return;
+    }
+
     if (action === "promoted") {
       // Ignore events where "from" is a bot (including ourselves)
-      if (from.is_bot) return;
+      if (from.is_bot) {
+        log("ignored_from_bot");
+        return;
+      }
 
       const session = config.getSession(from.id);
 
       if (!session) {
+        // The account that added the bot never connected a workspace. Usually
+        // the customer connected from one Telegram account and added the bot
+        // from another. If that account never opened the bot, the DM below
+        // fails with 403 and nothing else records the attempt.
         try {
           await ctx.telegram.sendMessage(
             from.id,
             l.promotedNoSession(channelTitle),
           );
+          log("no_session_dm_sent");
         } catch (err) {
-          console.log(`[my_chat_member] Could not DM user ${from.id}:`, String(err));
+          log(`no_session_dm_failed error=${JSON.stringify(String(err))}`);
         }
         return;
       }
@@ -102,23 +148,26 @@ export function registerMyChatMemberListener(
       };
       config.setChannelConfig(channelId, channelConfig);
       config.incrementStat("channel_connected");
+      log(`saved workspace=${session.workspaceId}`);
 
       const { text, extra } = buildPromotionMenu(channelConfig, workspaceName, l);
       await ctx.telegram.sendMessage(from.id, text, extra);
     }
 
     if (action === "demoted") {
+      const wasTracked = config.getChannelConfig(channelId) !== undefined;
       config.removeChannelConfig(channelId);
+      const removed = wasTracked ? "removed" : "removed_untracked";
       // Don't try to DM bots (including ourselves)
-      if (!from.is_bot) {
-        try {
-          await ctx.telegram.sendMessage(
-            from.id,
-            l.demoted(channelTitle),
-          );
-        } catch (err) {
-          console.log(`[my_chat_member] Could not DM user ${from.id}:`, String(err));
-        }
+      if (from.is_bot) {
+        log(removed);
+        return;
+      }
+      try {
+        await ctx.telegram.sendMessage(from.id, l.demoted(channelTitle));
+        log(removed);
+      } catch (err) {
+        log(`${removed} dm_failed error=${JSON.stringify(String(err))}`);
       }
     }
   });

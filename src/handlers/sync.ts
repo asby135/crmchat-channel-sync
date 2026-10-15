@@ -323,6 +323,10 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
 
     const channels = config.getChannelsByWorkspace(session.workspaceId);
     if (channels.length === 0) {
+      // The step where a stalled setup surfaces: workspace connected, no channel saved.
+      console.log(
+        `[sync] No channels for chat=${chatId} workspace=${session.workspaceId}`,
+      );
       await ctx.reply(l.syncNoChannels);
       return;
     }

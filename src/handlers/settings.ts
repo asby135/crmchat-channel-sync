@@ -124,6 +124,10 @@ export function registerSettingsHandler(
 
     const channels = config.getChannelsByWorkspace(session.workspaceId);
     if (channels.length === 0) {
+      // The step where a stalled setup surfaces: workspace connected, no channel saved.
+      console.log(
+        `[settings] No channels for chat=${chatId} workspace=${session.workspaceId}`,
+      );
       await ctx.reply(l.settingsNoChannels);
       return;
     }
