@@ -33,6 +33,9 @@ export const ru: Locale = {
   syncProgressShort: (title: string, synced: number | string, total: number | string) =>
     `Синхронизация ${title}...\n${synced}/${total} подписчиков`,
 
+  syncSearching: (title: string, found: number, total: number | string) =>
+    `Синхронизация ${title}...\nИщу подписчиков: найдено ${found} из ${total}`,
+
   syncComplete: (title: string) => `✅ Синхронизация ${title} завершена!`,
 
   syncNewContacts: (n: number) => `${n} новых контактов`,

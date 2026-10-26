@@ -168,3 +168,10 @@ describe("localizeBotError", () => {
     }
   });
 });
+
+describe("syncSearching", () => {
+  it("shows found and total in both languages", () => {
+    expect(t("ru").syncSearching("Канал", 640, 2000)).toContain("найдено 640 из 2000");
+    expect(t("en").syncSearching("Channel", 640, "?")).toContain("found 640 of ?");
+  });
+});

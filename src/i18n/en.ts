@@ -31,6 +31,9 @@ export const en = {
   syncProgressShort: (title: string, synced: number | string, total: number | string) =>
     `Syncing ${title}...\n${synced}/${total} subscribers`,
 
+  syncSearching: (title: string, found: number, total: number | string) =>
+    `Syncing ${title}...\nLooking for subscribers: found ${found} of ${total}`,
+
   syncComplete: (title: string) => `✅ Sync complete for ${title}!`,
 
   syncNewContacts: (n: number) => `${n} new contacts`,

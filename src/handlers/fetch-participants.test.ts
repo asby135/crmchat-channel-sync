@@ -134,6 +134,32 @@ describe("fetchAllParticipants", () => {
     expect(calls.filter((c) => c.q && c.q !== "").length).toBeLessThan(SEARCH_LETTERS.length);
   });
 
+  it("reports growing progress against Telegram's total during the sweep", async () => {
+    const { client } = fakeChannel(makeUsers(2000));
+    const updates: Array<[number, number | undefined]> = [];
+
+    await fetchAllParticipants(client, "ws", "acc", channel, undefined, (found, reported) => {
+      updates.push([found, reported]);
+    });
+
+    // First update fires before any letter is queried, so "0/?" never lingers.
+    expect(updates[0]).toEqual([200, 2000]);
+    expect(updates.length).toBeGreaterThan(1);
+    for (let i = 1; i < updates.length; i++) {
+      expect(updates[i][0]).toBeGreaterThanOrEqual(updates[i - 1][0]);
+      expect(updates[i][1]).toBe(2000);
+    }
+  });
+
+  it("reports no search progress for a small channel", async () => {
+    const { client } = fakeChannel(makeUsers(37));
+    const onSearchProgress = vi.fn();
+
+    await fetchAllParticipants(client, "ws", "acc", channel, undefined, onSearchProgress);
+
+    expect(onSearchProgress).not.toHaveBeenCalled();
+  });
+
   it("stops the sweep when the user presses Stop", async () => {
     const controller = new AbortController();
     const { client, calls } = fakeChannel(makeUsers(2000));

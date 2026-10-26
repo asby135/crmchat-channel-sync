@@ -98,6 +98,9 @@ export const SEARCH_LETTERS = [
 
 type RawCaller = Pick<CrmChatClient, "callTelegramRaw">;
 
+/** Subscribers found so far during the letter sweep, and Telegram's reported total. */
+export type SearchProgress = (found: number, reported: number | undefined) => void | Promise<void>;
+
 /** Every page of channelParticipantsSearch for one query. */
 async function searchParticipants(
   client: RawCaller,
@@ -166,6 +169,7 @@ export async function fetchAllParticipants(
   accountId: string,
   channel: Record<string, unknown>,
   signal?: AbortSignal,
+  onSearchProgress?: SearchProgress,
 ): Promise<{ participants: TelegramParticipant[]; users: Map<number, TelegramUser> }> {
   const participants = new Map<number, TelegramParticipant>();
   const users = new Map<number, TelegramUser>();
@@ -193,6 +197,9 @@ export async function fetchAllParticipants(
   console.log(
     `[bulkSync] Empty query returned ${baseline} of ${reported ?? "?"}; sweeping ${SEARCH_LETTERS.length} letters`,
   );
+  // The sweep takes minutes on a big channel; without this the customer
+  // stares at "0/?" and assumes the bot hung.
+  await onSearchProgress?.(participants.size, reported);
   for (const letter of SEARCH_LETTERS) {
     if (signal?.aborted) break;
     await sleep(2000);
@@ -202,6 +209,7 @@ export async function fetchAllParticipants(
     console.log(
       `[bulkSync] q="${letter}": ${batch.participants.length} found, +${participants.size - before} new, total ${participants.size}`,
     );
+    await onSearchProgress?.(participants.size, reported);
     if (reported !== undefined && participants.size >= reported) break;
   }
   console.log(
@@ -242,6 +250,7 @@ export async function bulkSync(options: {
   accessHash: string;
   propertyMapping?: PropertyMapping;
   onProgress?: (synced: number, total: number) => void | Promise<void>;
+  onSearchProgress?: SearchProgress;
   signal?: AbortSignal;
 }): Promise<SyncResult> {
   const {
@@ -253,6 +262,7 @@ export async function bulkSync(options: {
     signal,
     propertyMapping,
     onProgress,
+    onSearchProgress,
   } = options;
 
   const result: SyncResult = {
@@ -309,7 +319,14 @@ export async function bulkSync(options: {
   // a non-empty search reaches past the visible 200. See searchParticipants.
   console.log(`[bulkSync] Fetching channel participants via MTProto...`);
   const channel = { _: "inputChannel", channelId: toMtprotoChannelId(channelId), accessHash };
-  const merged = await fetchAllParticipants(client, workspaceId, accountId, channel, signal);
+  const merged = await fetchAllParticipants(
+    client,
+    workspaceId,
+    accountId,
+    channel,
+    signal,
+    onSearchProgress,
+  );
   const allParticipants = merged.participants;
   const userMap = merged.users;
 
@@ -537,6 +554,24 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
       }
     };
 
+    const onSearchProgress: SearchProgress = async (found, reported) => {
+      if (!msgId) return;
+      const now = Date.now();
+      if (now - lastProgressEdit < 2000) return;
+      lastProgressEdit = now;
+      try {
+        await ctx.telegram.editMessageText(
+          chatId,
+          msgId,
+          undefined,
+          l.syncSearching(channelTitle, found, reported ?? "?"),
+          stopBtn,
+        );
+      } catch {
+        // Ignore edit errors (message not modified, etc.)
+      }
+    };
+
     // Run sync in background to avoid Telegraf 90s callback timeout
     void (async () => {
     let result: SyncResult | null = null;
@@ -551,6 +586,7 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
         signal: abortController.signal,
         propertyMapping: channelConfig.propertyMapping,
         onProgress,
+        onSearchProgress,
       });
 
       // Update config with sync metadata

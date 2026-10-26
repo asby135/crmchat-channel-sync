@@ -1,7 +1,7 @@
 import { Markup, type Telegraf } from "telegraf";
 import type { ConfigStore } from "../config/store.js";
 import { CrmChatClient } from "../api/client.js";
-import { bulkSync } from "../handlers/sync.js";
+import { bulkSync, type SearchProgress } from "../handlers/sync.js";
 import { localizeBotError } from "../lib/api-errors.js";
 import { formatChannelSettings, channelSettingsKeyboard } from "../handlers/settings.js";
 import { findDefaultStageMapping } from "../lib/default-mapping.js";
@@ -263,6 +263,23 @@ export function registerMyChatMemberListener(
       }
     };
 
+    const onSearchProgress: SearchProgress = async (found, reported) => {
+      if (!msgId) return;
+      const now = Date.now();
+      if (now - lastProgressEdit < 2000) return;
+      lastProgressEdit = now;
+      try {
+        await ctx.telegram.editMessageText(
+          chatId,
+          msgId,
+          undefined,
+          l.syncSearching(channelTitle, found, reported ?? "?"),
+        );
+      } catch {
+        // Ignore edit errors (message not modified, etc.)
+      }
+    };
+
     // Run sync in background to avoid Telegraf 90s callback timeout
     void (async () => {
     try {
@@ -273,6 +290,7 @@ export function registerMyChatMemberListener(
         channelId,
         accessHash,
         onProgress,
+        onSearchProgress,
       });
 
       // Update config with sync metadata
