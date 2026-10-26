@@ -80,6 +80,137 @@ interface ChannelParticipantsResult {
   users: TelegramUser[];
 }
 
+// ── Participant fetching ──────────────────────────────────────────────
+
+const PARTICIPANTS_PAGE = 200;
+
+/**
+ * One-letter search queries tried when the empty query doesn't return the
+ * whole channel. Telegram matches them against first name, last name and
+ * username, so a subscriber is reached if any of those contains the letter.
+ * Names in other scripts or made only of emoji are not covered; good enough
+ * per product decision.
+ */
+export const SEARCH_LETTERS = [
+  ..."abcdefghijklmnopqrstuvwxyz",
+  ..."абвгдеёжзийклмнопрстуфхцчшщъыьэюя",
+];
+
+type RawCaller = Pick<CrmChatClient, "callTelegramRaw">;
+
+/** Every page of channelParticipantsSearch for one query. */
+async function searchParticipants(
+  client: RawCaller,
+  workspaceId: string,
+  accountId: string,
+  channel: Record<string, unknown>,
+  q: string,
+): Promise<{ participants: TelegramParticipant[]; users: TelegramUser[] }> {
+  const participants: TelegramParticipant[] = [];
+  const users: TelegramUser[] = [];
+  let offset = 0;
+
+  while (true) {
+    const page = (await withFloodRetry(() =>
+      client.callTelegramRaw(workspaceId, accountId, "channels.getParticipants", {
+        channel,
+        filter: { _: "channelParticipantsSearch", q },
+        offset,
+        limit: PARTICIPANTS_PAGE,
+        hash: "0",
+      }),
+    )) as ChannelParticipantsResult;
+
+    if (q === "") {
+      console.log(`[bulkSync] MTProto page: type=${page._}, participants=${page.participants?.length ?? 0}`);
+    }
+    if (!page.participants || page.participants.length === 0) break;
+
+    participants.push(...page.participants);
+    users.push(...(page.users ?? []));
+
+    if (page.participants.length < PARTICIPANTS_PAGE) break;
+    offset += PARTICIPANTS_PAGE;
+    await sleep(2000); // rate limit between MTProto calls
+  }
+
+  return { participants, users };
+}
+
+/** Subscriber count Telegram reports for the channel, or undefined if unavailable. */
+async function fetchParticipantsCount(
+  client: RawCaller,
+  workspaceId: string,
+  accountId: string,
+  channel: Record<string, unknown>,
+): Promise<number | undefined> {
+  try {
+    const full = (await withFloodRetry(() =>
+      client.callTelegramRaw(workspaceId, accountId, "channels.getFullChannel", { channel }),
+    )) as { fullChat?: { participantsCount?: number } };
+    return full.fullChat?.participantsCount;
+  } catch (err) {
+    console.warn(`[bulkSync] getFullChannel failed, sweeping letters anyway:`, String(err));
+    return undefined;
+  }
+}
+
+/**
+ * Empty query first; if that came back with only full pages and Telegram says
+ * the channel has more subscribers, sweep SEARCH_LETTERS and merge by user id.
+ * Small channels (a partial first page) never make an extra request.
+ */
+export async function fetchAllParticipants(
+  client: RawCaller,
+  workspaceId: string,
+  accountId: string,
+  channel: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<{ participants: TelegramParticipant[]; users: Map<number, TelegramUser> }> {
+  const participants = new Map<number, TelegramParticipant>();
+  const users = new Map<number, TelegramUser>();
+  const add = (batch: { participants: TelegramParticipant[]; users: TelegramUser[] }) => {
+    for (const u of batch.users) users.set(u.id, u);
+    for (const p of batch.participants) {
+      if (!participants.has(p.userId)) participants.set(p.userId, p);
+    }
+  };
+
+  add(await searchParticipants(client, workspaceId, accountId, channel, ""));
+  const baseline = participants.size;
+
+  // A partial page means the empty query already returned everything.
+  if (baseline === 0 || baseline % PARTICIPANTS_PAGE !== 0) {
+    return { participants: [...participants.values()], users };
+  }
+
+  await sleep(2000);
+  const reported = await fetchParticipantsCount(client, workspaceId, accountId, channel);
+  if (reported !== undefined && reported <= baseline) {
+    return { participants: [...participants.values()], users };
+  }
+
+  console.log(
+    `[bulkSync] Empty query returned ${baseline} of ${reported ?? "?"}; sweeping ${SEARCH_LETTERS.length} letters`,
+  );
+  for (const letter of SEARCH_LETTERS) {
+    if (signal?.aborted) break;
+    await sleep(2000);
+    const before = participants.size;
+    const batch = await searchParticipants(client, workspaceId, accountId, channel, letter);
+    add(batch);
+    console.log(
+      `[bulkSync] q="${letter}": ${batch.participants.length} found, +${participants.size - before} new, total ${participants.size}`,
+    );
+    if (reported !== undefined && participants.size >= reported) break;
+  }
+  console.log(
+    `[bulkSync] Letter sweep done: ${participants.size} of ${reported ?? "?"} (empty query alone: ${baseline})`,
+  );
+
+  return { participants: [...participants.values()], users };
+}
+
 // ── Pure helpers ──────────────────────────────────────────────────────
 
 export function buildFullName(
@@ -169,58 +300,18 @@ export async function bulkSync(options: {
     }
   }
 
-  // 2. FETCH SUBSCRIBERS via MTProto pagination.
+  // 2. FETCH SUBSCRIBERS via MTProto.
   //
-  // Filter choice matters: `channelParticipantsRecent` is server-capped at ~200
-  // results total regardless of pagination — same cap admins see in Telegram's
-  // own "Subscribers" tab on a broadcast channel. Using `channelParticipantsSearch`
-  // with an empty query is the canonical full-enumeration pattern (Telethon,
-  // MadelineProto, GramJS all do this). For megagroups it unlocks up to ~10K
-  // members per chain. For broadcast channels Telegram still policy-caps admin
-  // visibility around 200, so this won't magically bypass that limit — but it's
-  // the right filter and at least removes the client-side limitation.
+  // `channelParticipantsSearch` with an empty query enumerates a megagroup
+  // fully (up to ~10K), but on a broadcast channel Telegram stops at ~200, the
+  // same list admins see in the "Subscribers" tab. When that happens we sweep
+  // one-letter queries (a–z, а–я) and merge the results, on the hypothesis that
+  // a non-empty search reaches past the visible 200. See searchParticipants.
   console.log(`[bulkSync] Fetching channel participants via MTProto...`);
-  const allParticipants: TelegramParticipant[] = [];
-  const allUsers: TelegramUser[] = [];
-  let offset = 0;
-  const limit = 200;
-
-  while (true) {
-    const raw = await withFloodRetry(() =>
-      client.callTelegramRaw(
-        workspaceId,
-        accountId,
-        "channels.getParticipants",
-        {
-          channel: { _: "inputChannel", channelId: toMtprotoChannelId(channelId), accessHash },
-          filter: { _: "channelParticipantsSearch", q: "" },
-          offset,
-          limit,
-          hash: "0",
-        },
-      ),
-    );
-
-    const page = raw as ChannelParticipantsResult;
-
-    console.log(`[bulkSync] MTProto page: type=${page._}, participants=${page.participants?.length ?? 0}`);
-
-    if (!page.participants || page.participants.length === 0) break;
-
-    allParticipants.push(...page.participants);
-    allUsers.push(...page.users);
-
-    if (page.participants.length < limit) break;
-
-    offset += limit;
-    await sleep(2000); // rate limit between MTProto calls
-  }
-
-  // Build user lookup map
-  const userMap = new Map<number, TelegramUser>();
-  for (const user of allUsers) {
-    userMap.set(user.id, user);
-  }
+  const channel = { _: "inputChannel", channelId: toMtprotoChannelId(channelId), accessHash };
+  const merged = await fetchAllParticipants(client, workspaceId, accountId, channel, signal);
+  const allParticipants = merged.participants;
+  const userMap = merged.users;
 
   result.total = allParticipants.length;
   console.log(`[bulkSync] Total participants: ${result.total}, existing dedup set: ${existingTelegramIds.size}`);
