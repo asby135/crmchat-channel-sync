@@ -8,6 +8,10 @@ interface DialogChat {
   _: string;
   id: number | string;
   accessHash?: string;
+  /** Set when the account calling getDialogs created the channel. */
+  creator?: boolean;
+  /** Present when the account calling getDialogs is an admin of the channel. */
+  adminRights?: unknown;
 }
 
 interface DialogUser {
@@ -67,6 +71,21 @@ export async function findChannelAccessHash(
   accountId: string,
   mtprotoChannelId: number,
 ): Promise<string | null> {
+  const found = await findChannelInDialogs(callRaw, workspaceId, accountId, mtprotoChannelId);
+  return found?.accessHash ?? null;
+}
+
+/**
+ * Walk the account's dialog list for the target channel. Returns its access
+ * hash and whether this account is the channel's creator or an admin, which is
+ * what Telegram requires to list subscribers.
+ */
+export async function findChannelInDialogs(
+  callRaw: RawCaller,
+  workspaceId: string,
+  accountId: string,
+  mtprotoChannelId: number,
+): Promise<{ accessHash: string; isAdmin: boolean } | null> {
   let offsetDate = 0;
   let offsetId = 0;
   let offsetPeer: Record<string, unknown> = { _: "inputPeerEmpty" };
@@ -90,7 +109,7 @@ export async function findChannelAccessHash(
     // Scan this page for the target channel.
     for (const chat of result.chats ?? []) {
       if (Number(chat.id) === mtprotoChannelId && chat.accessHash) {
-        return chat.accessHash;
+        return { accessHash: chat.accessHash, isAdmin: Boolean(chat.creator || chat.adminRights) };
       }
     }
 
@@ -147,34 +166,69 @@ export async function findChannelAccessHash(
 
 /**
  * Resolve accountId and accessHash for a channel.
- * Picks the first active Telegram account, then pages through dialogs to
- * find the accessHash.
+ *
+ * A workspace can have several Telegram accounts connected, and only some of
+ * them are in a given channel. Checks every active account and prefers one that
+ * owns or administers the channel, since Telegram only lists subscribers to
+ * admins. A member-only account is the fallback, so the sync can at least
+ * report "not an admin" instead of "can't see the channel". An account that
+ * errors (disconnected, restricted) is skipped rather than ending the search.
  */
 export async function resolveAccountAndAccessHash(
   client: CrmChatClient,
   workspaceId: string,
   channelId: number,
 ): Promise<{ accountId: string; accessHash: string }> {
-  const accounts = await client.listTelegramAccounts(workspaceId);
-  const active = accounts.find((a) => a.status === "active");
-  if (!active) {
+  const accounts = (await client.listTelegramAccounts(workspaceId)).filter(
+    (a) => a.status === "active",
+  );
+  if (accounts.length === 0) {
+    console.log(`[resolve_channel] channel=${channelId} workspace=${workspaceId} no active accounts`);
     throw new Error("NO_ACTIVE_TG_ACCOUNT");
   }
 
-  const accountId = active.id;
   const mtprotoId = toMtprotoChannelId(channelId);
+  const callRaw: RawCaller = (ws, acc, method, params) =>
+    client.callTelegramRaw(ws, acc, method, params);
 
-  const accessHash = await findChannelAccessHash(
-    (ws, acc, method, params) =>
-      client.callTelegramRaw(ws, acc, method, params),
-    workspaceId,
-    accountId,
-    mtprotoId,
-  );
+  let memberOnly: { accountId: string; accessHash: string } | null = null;
+  let lastError: unknown = null;
+  let checked = 0;
 
-  if (!accessHash) {
-    throw new Error(`Could not resolve accessHash for channel ${channelId}`);
+  for (const account of accounts) {
+    const label = account.telegram.username ? `@${account.telegram.username}` : account.id;
+    let found: Awaited<ReturnType<typeof findChannelInDialogs>>;
+    try {
+      found = await findChannelInDialogs(callRaw, workspaceId, account.id, mtprotoId);
+    } catch (err) {
+      lastError = err;
+      console.log(
+        `[resolve_channel] channel=${channelId} account=${label} error=${JSON.stringify(String(err))}`,
+      );
+      continue;
+    }
+    checked++;
+
+    if (!found) {
+      console.log(`[resolve_channel] channel=${channelId} account=${label} not in chats`);
+      continue;
+    }
+    if (found.isAdmin) {
+      console.log(`[resolve_channel] channel=${channelId} account=${label} admin, using it`);
+      return { accountId: account.id, accessHash: found.accessHash };
+    }
+    console.log(`[resolve_channel] channel=${channelId} account=${label} member, not admin`);
+    memberOnly ??= { accountId: account.id, accessHash: found.accessHash };
   }
 
-  return { accountId, accessHash };
+  if (memberOnly) return memberOnly;
+
+  // Every account failed outright: surface the real reason (e.g. a disconnected
+  // account) rather than claiming none of them can see the channel.
+  if (checked === 0 && lastError) throw lastError;
+
+  console.log(
+    `[resolve_channel] channel=${channelId} not found in any of ${accounts.length} active accounts`,
+  );
+  throw new Error(`Could not resolve accessHash for channel ${channelId}`);
 }

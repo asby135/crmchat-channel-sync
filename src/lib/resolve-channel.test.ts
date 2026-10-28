@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { findChannelAccessHash } from "./resolve-channel.js";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { findChannelAccessHash, resolveAccountAndAccessHash } from "./resolve-channel.js";
+import type { CrmChatClient } from "../api/client.js";
 
 // Build a fake "messages.dialogsSlice" page where the target channel is
 // absent — used to simulate the first N pages before the one we want.
@@ -119,5 +120,150 @@ describe("findChannelAccessHash", () => {
 
     expect(hash).toBeNull();
     expect(callRaw).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── Account selection ─────────────────────────────────────────────────
+
+const CHANNEL = -1001903470229; // Bot API id; MTProto id is 1903470229
+const MTPROTO = 1903470229;
+
+type Role = "absent" | "member" | "admin" | "creator" | "error";
+
+/** One full dialogs page per account, holding the channel with the given role. */
+function fakeWorkspace(accounts: Array<{ id: string; username: string; role: Role; status?: string }>) {
+  const callRaw = vi.fn(async (_ws: string, accountId: string) => {
+    const acc = accounts.find((a) => a.id === accountId)!;
+    if (acc.role === "error") throw new Error("API error 412: AUTH_KEY_UNREGISTERED");
+    const chats =
+      acc.role === "absent"
+        ? []
+        : [{
+            _: "channel",
+            id: MTPROTO,
+            accessHash: `hash_${acc.id}`,
+            ...(acc.role === "creator" ? { creator: true } : {}),
+            ...(acc.role === "admin" ? { adminRights: { _: "chatAdminRights" } } : {}),
+          }];
+    return { _: "messages.dialogs", dialogs: [], messages: [], chats, users: [] };
+  });
+  const client = {
+    listTelegramAccounts: vi.fn(async () =>
+      accounts.map((a) => ({
+        id: a.id,
+        workspaceId: "ws",
+        status: a.status ?? "active",
+        telegram: { id: 1, username: a.username, phone: null },
+      })),
+    ),
+    callTelegramRaw: callRaw,
+  } as unknown as CrmChatClient;
+  return { client, callRaw };
+}
+
+describe("resolveAccountAndAccessHash", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  // Regression: the first active account was the only one checked. With
+  // several accounts connected, a channel owned by the third one was reported
+  // as "the connected account can't see this channel".
+  it("finds the channel through any connected account, not just the first", async () => {
+    const { client } = fakeWorkspace([
+      { id: "hints", username: "sergei_hints", role: "absent" },
+      { id: "hints2", username: "sergeihints", role: "absent" },
+      { id: "owner", username: "asby135", role: "creator" },
+    ]);
+
+    const resolved = await resolveAccountAndAccessHash(client, "ws", CHANNEL);
+
+    expect(resolved).toEqual({ accountId: "owner", accessHash: "hash_owner" });
+  });
+
+  it("prefers an admin over a member account that happens to come first", async () => {
+    const { client } = fakeWorkspace([
+      { id: "subscriber", username: "reader", role: "member" },
+      { id: "admin", username: "editor", role: "admin" },
+    ]);
+
+    const resolved = await resolveAccountAndAccessHash(client, "ws", CHANNEL);
+
+    expect(resolved.accountId).toBe("admin");
+  });
+
+  it("stops at the first admin without scanning the rest", async () => {
+    const { client, callRaw } = fakeWorkspace([
+      { id: "owner", username: "asby135", role: "creator" },
+      { id: "other", username: "sergei_hints", role: "absent" },
+    ]);
+
+    await resolveAccountAndAccessHash(client, "ws", CHANNEL);
+
+    expect(callRaw.mock.calls.map((c) => c[1])).toEqual(["owner"]);
+  });
+
+  it("falls back to a member account when no admin is connected", async () => {
+    const { client } = fakeWorkspace([
+      { id: "a", username: "a", role: "absent" },
+      { id: "subscriber", username: "reader", role: "member" },
+    ]);
+
+    const resolved = await resolveAccountAndAccessHash(client, "ws", CHANNEL);
+
+    expect(resolved.accountId).toBe("subscriber");
+  });
+
+  it("skips an account that errors and keeps looking", async () => {
+    const { client } = fakeWorkspace([
+      { id: "broken", username: "sergei_crmchat", role: "error" },
+      { id: "owner", username: "asby135", role: "creator" },
+    ]);
+
+    const resolved = await resolveAccountAndAccessHash(client, "ws", CHANNEL);
+
+    expect(resolved.accountId).toBe("owner");
+  });
+
+  it("ignores accounts that aren't active", async () => {
+    const { client, callRaw } = fakeWorkspace([
+      { id: "banned", username: "x", role: "creator", status: "banned" },
+      { id: "owner", username: "asby135", role: "creator" },
+    ]);
+
+    const resolved = await resolveAccountAndAccessHash(client, "ws", CHANNEL);
+
+    expect(resolved.accountId).toBe("owner");
+    expect(callRaw.mock.calls.map((c) => c[1])).not.toContain("banned");
+  });
+
+  it("reports the channel as not visible when no account has it", async () => {
+    const { client } = fakeWorkspace([
+      { id: "a", username: "a", role: "absent" },
+      { id: "b", username: "b", role: "absent" },
+    ]);
+
+    await expect(resolveAccountAndAccessHash(client, "ws", CHANNEL)).rejects.toThrow(
+      /Could not resolve accessHash/,
+    );
+  });
+
+  it("surfaces the real error when every account failed outright", async () => {
+    const { client } = fakeWorkspace([
+      { id: "a", username: "a", role: "error" },
+      { id: "b", username: "b", role: "error" },
+    ]);
+
+    await expect(resolveAccountAndAccessHash(client, "ws", CHANNEL)).rejects.toThrow(
+      /AUTH_KEY_UNREGISTERED/,
+    );
+  });
+
+  it("still reports no active account when none are connected", async () => {
+    const { client } = fakeWorkspace([{ id: "a", username: "a", role: "creator", status: "offline" }]);
+
+    await expect(resolveAccountAndAccessHash(client, "ws", CHANNEL)).rejects.toThrow(
+      "NO_ACTIVE_TG_ACCOUNT",
+    );
   });
 });
