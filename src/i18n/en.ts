@@ -89,6 +89,7 @@ export const en = {
 
   syncForceButton: "🔄 Force re-sync",
   syncStopBtn: "⏹ Stop sync",
+  syncAlreadyRunning: "Sync is already running for this channel.",
   syncStopped: (title: string) => `⏹ Sync stopped for ${title}.`,
 
   // ── settings.ts ───────────────────────────────────────────────────

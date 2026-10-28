@@ -10,9 +10,41 @@ import { toMtprotoChannelId } from "../lib/telegram.js";
 import { resolveAccountAndAccessHash } from "../lib/resolve-channel.js";
 import { t } from "../i18n/index.js";
 
-// ── Active sync abort controllers ────────────────────────────────────
+// ── Active syncs (one per channel) ───────────────────────────────────
 
-const activeSyncs = new Map<string, AbortController>();
+/**
+ * Channels with a sync in flight. A channel is claimed the moment its sync
+ * button is tapped, before the multi-second access-hash lookup, and released
+ * when the sync ends. Without this, a second tap during the lookup started a
+ * second handler that hijacked the Stop button and, if it landed a moment
+ * later, launched a parallel sync that created duplicate contacts.
+ * Shared by /sync and the "Sync now" button after the bot is added.
+ */
+const activeSyncs = new Map<number, AbortController>();
+
+/** Claim a channel for syncing. Returns null if a sync is already running for it. */
+export function claimSync(channelId: number): AbortController | null {
+  if (activeSyncs.has(channelId)) return null;
+  const controller = new AbortController();
+  activeSyncs.set(channelId, controller);
+  return controller;
+}
+
+/** Release a claim. A no-op unless `controller` still owns the channel. */
+export function releaseSync(channelId: number, controller: AbortController): void {
+  if (activeSyncs.get(channelId) === controller) activeSyncs.delete(channelId);
+}
+
+/**
+ * Ask the running sync to stop. The claim stays until that sync actually
+ * winds down, so a new one can't start on top of it.
+ */
+export function stopSync(channelId: number): boolean {
+  const controller = activeSyncs.get(channelId);
+  if (!controller) return false;
+  controller.abort();
+  return true;
+}
 
 // ── Flood / rate-limit retry helpers ─────────────────────────────────
 
@@ -460,16 +492,16 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
     const lang = ctx.from?.language_code;
     const l = t(lang);
 
-    await ctx.answerCbQuery();
-
     const channelConfig = config.getChannelConfig(channelId);
     if (!channelConfig) {
+      await ctx.answerCbQuery();
       await ctx.editMessageText(l.syncChannelNotFound);
       return;
     }
 
     // Prevent accidental re-sync: offer force button instead
     if (channelConfig.lastSyncAt && !ctx.match[0].startsWith("force_sync_channel:")) {
+      await ctx.answerCbQuery();
       const alreadyText = l.syncAlreadySynced(
         channelConfig.channelTitle,
         channelConfig.subscriberCount ?? 0,
@@ -484,178 +516,187 @@ export function registerSyncHandler(bot: Telegraf, config: ConfigStore): void {
       return;
     }
 
-    const client = new CrmChatClient(channelConfig.apiKey);
-    const channelTitle = channelConfig.channelTitle;
+    const abortController = claimSync(channelId);
+    if (!abortController) {
+      await ctx.answerCbQuery(l.syncAlreadyRunning);
+      return;
+    }
+    await ctx.answerCbQuery();
 
-    // Resolve accountId and accessHash if missing (e.g. saved at promotion time before sync_now)
-    let { accountId, accessHash } = channelConfig;
-    if (!accountId || !accessHash) {
+    let handedOff = false;
+    try {
+      const client = new CrmChatClient(channelConfig.apiKey);
+      const channelTitle = channelConfig.channelTitle;
+
+      // Show progress right away. The access-hash lookup below pages through the
+      // account's chats and can take several seconds; with no visible change,
+      // customers tapped again.
+      const stopBtn = Markup.inlineKeyboard([
+        Markup.button.callback(l.syncStopBtn, `stop_sync:${channelId}`),
+      ]);
+      const progressMsg = await ctx.editMessageText(
+        l.syncProgress(channelTitle, 0, "?", buildProgressBar(0)),
+        stopBtn,
+      );
+
+      // Determine message ID for editing
+      const msgId =
+        typeof progressMsg === "object" && "message_id" in progressMsg
+          ? progressMsg.message_id
+          : undefined;
+
+      // Resolve accountId and accessHash if missing (e.g. saved at promotion time before sync_now)
+      let { accountId, accessHash } = channelConfig;
+      if (!accountId || !accessHash) {
+        try {
+          const resolved = await resolveAccountAndAccessHash(
+            client,
+            channelConfig.workspaceId,
+            channelId,
+          );
+          accountId = resolved.accountId;
+          accessHash = resolved.accessHash;
+          // Persist so we don't have to resolve again
+          config.setChannelConfig(channelId, {
+            ...channelConfig,
+            accountId,
+            accessHash,
+          });
+        } catch (err) {
+          await ctx.editMessageText(
+            l.syncFailed(channelTitle, localizeBotError(err, l)),
+          );
+          return;
+        }
+      }
+
+
+      let lastProgressEdit = 0;
+      const onProgress = async (synced: number, total: number) => {
+        if (!msgId) return;
+        // Throttle edits: update at most every 2 seconds, plus always on completion
+        const now = Date.now();
+        if (synced < total && now - lastProgressEdit < 2000) return;
+        lastProgressEdit = now;
+        const ratio = total > 0 ? synced / total : 0;
+        const bar = buildProgressBar(ratio);
+        try {
+          await ctx.telegram.editMessageText(
+            chatId,
+            msgId,
+            undefined,
+            l.syncProgress(channelTitle, synced, total, bar),
+            stopBtn,
+          );
+        } catch {
+          // Ignore edit errors (message not modified, etc.)
+        }
+      };
+
+      const onSearchProgress: SearchProgress = async (found, reported) => {
+        if (!msgId) return;
+        const now = Date.now();
+        if (now - lastProgressEdit < 2000) return;
+        lastProgressEdit = now;
+        try {
+          await ctx.telegram.editMessageText(
+            chatId,
+            msgId,
+            undefined,
+            l.syncSearching(channelTitle, found, reported ?? "?"),
+            stopBtn,
+          );
+        } catch {
+          // Ignore edit errors (message not modified, etc.)
+        }
+      };
+
+      // Run sync in background to avoid Telegraf 90s callback timeout.
+      // From here the background task owns the claim and releases it when done.
+      handedOff = true;
+      void (async () => {
+      let result: SyncResult | null = null;
+      let syncErr: unknown = null;
       try {
-        const resolved = await resolveAccountAndAccessHash(
+        result = await bulkSync({
           client,
-          channelConfig.workspaceId,
-          channelId,
-        );
-        accountId = resolved.accountId;
-        accessHash = resolved.accessHash;
-        // Persist so we don't have to resolve again
+          workspaceId: channelConfig.workspaceId,
+          accountId,
+          channelId: channelConfig.channelId,
+          accessHash,
+          signal: abortController.signal,
+          propertyMapping: channelConfig.propertyMapping,
+          onProgress,
+          onSearchProgress,
+        });
+
+        // Update config with sync metadata
         config.setChannelConfig(channelId, {
           ...channelConfig,
-          accountId,
-          accessHash,
+          lastSyncAt: new Date().toISOString(),
+          subscriberCount: result.total,
         });
+        config.incrementStat("sync_completed");
       } catch (err) {
-        await ctx.editMessageText(
-          l.syncFailed(channelTitle, localizeBotError(err, l)),
-        );
-        return;
+        syncErr = err;
+        console.error(`[sync] Error syncing channel ${channelId}:`, err);
       }
-    }
 
-    // Abort controller for stop button
-    const abortController = new AbortController();
-    const stopKey = `stop_sync:${channelId}`;
-    activeSyncs.set(stopKey, abortController);
+      releaseSync(channelId, abortController);
 
-    // Send initial progress message with stop button
-    const stopBtn = Markup.inlineKeyboard([
-      Markup.button.callback(l.syncStopBtn, stopKey),
-    ]);
-    const progressMsg = await ctx.editMessageText(
-      l.syncProgress(channelTitle, 0, "?", buildProgressBar(0)),
-      stopBtn,
-    );
-
-    // Determine message ID for editing
-    const msgId =
-      typeof progressMsg === "object" && "message_id" in progressMsg
-        ? progressMsg.message_id
-        : undefined;
-
-    let lastProgressEdit = 0;
-    const onProgress = async (synced: number, total: number) => {
+      // Edit the final message (isolated from sync error handling — a failed
+      // final edit should not be misreported as a sync failure)
       if (!msgId) return;
-      // Throttle edits: update at most every 2 seconds, plus always on completion
-      const now = Date.now();
-      if (synced < total && now - lastProgressEdit < 2000) return;
-      lastProgressEdit = now;
-      const ratio = total > 0 ? synced / total : 0;
-      const bar = buildProgressBar(ratio);
+
       try {
-        await ctx.telegram.editMessageText(
-          chatId,
-          msgId,
-          undefined,
-          l.syncProgress(channelTitle, synced, total, bar),
-          stopBtn,
-        );
-      } catch {
-        // Ignore edit errors (message not modified, etc.)
+        if (result) {
+          const wasStopped = abortController.signal.aborted;
+          // total === 200 is the tell-tale signature of hitting the Telegram
+          // broadcast-channel admin-visibility cap: our pagination loop returns
+          // exactly the first page and then nothing. Surface the note so the
+          // user knows it's a Telegram policy limit, not a sync failure, and
+          // that ongoing chat_member tracking is unaffected.
+          const hitBroadcastCap = !wasStopped && result.total === 200;
+          const completionText = [
+            wasStopped ? l.syncStopped(channelTitle) : l.syncComplete(channelTitle),
+            l.syncNewContacts(result.created),
+            l.syncExisting(result.existing),
+            l.syncPrivate(result.private),
+            l.syncFailedCount(result.failed),
+            l.syncCheckCrm,
+            ...(hitBroadcastCap ? [l.syncBroadcastCapNote] : []),
+          ].join("\n");
+          await ctx.telegram.editMessageText(
+            chatId,
+            msgId,
+            undefined,
+            completionText,
+            { reply_markup: { inline_keyboard: [] } },
+          );
+        } else {
+          const errorText = l.syncFailed(channelTitle, localizeBotError(syncErr, l));
+          await ctx.telegram.editMessageText(
+            chatId,
+            msgId,
+            undefined,
+            errorText,
+            { reply_markup: { inline_keyboard: [] } },
+          );
+        }
+      } catch (editErr) {
+        console.error(`[sync] Final edit failed for channel ${channelId}:`, editErr);
       }
-    };
-
-    const onSearchProgress: SearchProgress = async (found, reported) => {
-      if (!msgId) return;
-      const now = Date.now();
-      if (now - lastProgressEdit < 2000) return;
-      lastProgressEdit = now;
-      try {
-        await ctx.telegram.editMessageText(
-          chatId,
-          msgId,
-          undefined,
-          l.syncSearching(channelTitle, found, reported ?? "?"),
-          stopBtn,
-        );
-      } catch {
-        // Ignore edit errors (message not modified, etc.)
-      }
-    };
-
-    // Run sync in background to avoid Telegraf 90s callback timeout
-    void (async () => {
-    let result: SyncResult | null = null;
-    let syncErr: unknown = null;
-    try {
-      result = await bulkSync({
-        client,
-        workspaceId: channelConfig.workspaceId,
-        accountId,
-        channelId: channelConfig.channelId,
-        accessHash,
-        signal: abortController.signal,
-        propertyMapping: channelConfig.propertyMapping,
-        onProgress,
-        onSearchProgress,
-      });
-
-      // Update config with sync metadata
-      config.setChannelConfig(channelId, {
-        ...channelConfig,
-        lastSyncAt: new Date().toISOString(),
-        subscriberCount: result.total,
-      });
-      config.incrementStat("sync_completed");
-    } catch (err) {
-      syncErr = err;
-      console.error(`[sync] Error syncing channel ${channelId}:`, err);
+      })(); // end background sync IIFE
+    } finally {
+      // Any exit before the background task took over (failed lookup, failed
+      // edit) must free the channel, or it stays "already running" until restart.
+      if (!handedOff) releaseSync(channelId, abortController);
     }
-
-    activeSyncs.delete(stopKey);
-
-    // Edit the final message (isolated from sync error handling — a failed
-    // final edit should not be misreported as a sync failure)
-    if (!msgId) return;
-
-    try {
-      if (result) {
-        const wasStopped = abortController.signal.aborted;
-        // total === 200 is the tell-tale signature of hitting the Telegram
-        // broadcast-channel admin-visibility cap: our pagination loop returns
-        // exactly the first page and then nothing. Surface the note so the
-        // user knows it's a Telegram policy limit, not a sync failure, and
-        // that ongoing chat_member tracking is unaffected.
-        const hitBroadcastCap = !wasStopped && result.total === 200;
-        const completionText = [
-          wasStopped ? l.syncStopped(channelTitle) : l.syncComplete(channelTitle),
-          l.syncNewContacts(result.created),
-          l.syncExisting(result.existing),
-          l.syncPrivate(result.private),
-          l.syncFailedCount(result.failed),
-          l.syncCheckCrm,
-          ...(hitBroadcastCap ? [l.syncBroadcastCapNote] : []),
-        ].join("\n");
-        await ctx.telegram.editMessageText(
-          chatId,
-          msgId,
-          undefined,
-          completionText,
-          { reply_markup: { inline_keyboard: [] } },
-        );
-      } else {
-        const errorText = l.syncFailed(channelTitle, localizeBotError(syncErr, l));
-        await ctx.telegram.editMessageText(
-          chatId,
-          msgId,
-          undefined,
-          errorText,
-          { reply_markup: { inline_keyboard: [] } },
-        );
-      }
-    } catch (editErr) {
-      console.error(`[sync] Final edit failed for channel ${channelId}:`, editErr);
-    }
-    })(); // end background sync IIFE
   });
 
   // Stop sync callback
   bot.action(/^stop_sync:(-?\d+)$/, async (ctx) => {
-    const key = ctx.match[0];
-    const controller = activeSyncs.get(key);
-    if (controller) {
-      controller.abort();
-      activeSyncs.delete(key);
-    }
+    stopSync(Number(ctx.match[1]));
     await ctx.answerCbQuery();
   });
 }

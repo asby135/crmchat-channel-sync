@@ -91,6 +91,7 @@ export const ru: Locale = {
 
   syncForceButton: "🔄 Синхронизировать заново",
   syncStopBtn: "⏹ Остановить",
+  syncAlreadyRunning: "Синхронизация этого канала уже идёт.",
   syncStopped: (title: string) => `⏹ Синхронизация ${title} остановлена.`,
 
   // ── settings.ts ───────────────────────────────────────────────────

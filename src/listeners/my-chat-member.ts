@@ -1,7 +1,7 @@
 import { Markup, type Telegraf } from "telegraf";
 import type { ConfigStore } from "../config/store.js";
 import { CrmChatClient } from "../api/client.js";
-import { bulkSync, type SearchProgress } from "../handlers/sync.js";
+import { bulkSync, claimSync, releaseSync, type SearchProgress } from "../handlers/sync.js";
 import { localizeBotError } from "../lib/api-errors.js";
 import { formatChannelSettings, channelSettingsKeyboard } from "../handlers/settings.js";
 import { findDefaultStageMapping } from "../lib/default-mapping.js";
@@ -189,154 +189,171 @@ export function registerMyChatMemberListener(
       return;
     }
 
-    // Resolve account and accessHash
-    const client = new CrmChatClient(session.apiKey);
-    let accountId: string;
-    let accessHash: string;
-    try {
-      const resolved = await resolveAccountAndAccessHash(
-        client,
-        session.workspaceId,
-        channelId,
-      );
-      accountId = resolved.accountId;
-      accessHash = resolved.accessHash;
-    } catch (err) {
-      await ctx.answerCbQuery();
-      // Every error now carries its own explanation and next step.
-      const errMsg = err instanceof Error ? err.message : "Unknown error";
-      const text =
-        errMsg === "NO_ACTIVE_TG_ACCOUNT"
-          ? localizeBotError(err, l)
-          : l.syncNowResolveFailed(localizeBotError(err, l));
-      await ctx.editMessageText(text);
+    // One sync per channel, shared with /sync: a second tap gets a toast.
+    const abortController = claimSync(channelId);
+    if (!abortController) {
+      await ctx.answerCbQuery(l.syncAlreadyRunning);
       return;
     }
+    await ctx.answerCbQuery();
 
-    // Read title from the config saved at promotion time
-    const existingConfig = config.getChannelConfig(channelId);
-    const channelTitle = existingConfig?.channelTitle ?? `Channel ${channelId}`;
+    let handedOff = false;
+    try {
+      // Read title from the config saved at promotion time
+      const existingConfig = config.getChannelConfig(channelId);
+      const channelTitle = existingConfig?.channelTitle ?? `Channel ${channelId}`;
 
-    config.setChannelConfig(channelId, {
-      ...(existingConfig ?? {
+      // Show progress right away: the access-hash lookup below can take several
+      // seconds, and with no visible change customers tapped again.
+      const progressMsg = await ctx.editMessageText(
+        l.syncProgressShort(channelTitle, 0, "?"),
+      );
+
+      const msgId =
+        typeof progressMsg === "object" && "message_id" in progressMsg
+          ? progressMsg.message_id
+          : undefined;
+
+      // Resolve account and accessHash
+      const client = new CrmChatClient(session.apiKey);
+      let accountId: string;
+      let accessHash: string;
+      try {
+        const resolved = await resolveAccountAndAccessHash(
+          client,
+          session.workspaceId,
+          channelId,
+        );
+        accountId = resolved.accountId;
+        accessHash = resolved.accessHash;
+      } catch (err) {
+        // Every error now carries its own explanation and next step.
+        const errMsg = err instanceof Error ? err.message : "Unknown error";
+        const text =
+          errMsg === "NO_ACTIVE_TG_ACCOUNT"
+            ? localizeBotError(err, l)
+            : l.syncNowResolveFailed(localizeBotError(err, l));
+        await ctx.editMessageText(text);
+        return;
+      }
+
+      config.setChannelConfig(channelId, {
+        ...(existingConfig ?? {
+          channelId,
+          channelTitle,
+          workspaceId: session.workspaceId,
+          apiKey: session.apiKey,
+          addedAt: new Date().toISOString(),
+        }),
         channelId,
         channelTitle,
         workspaceId: session.workspaceId,
-        apiKey: session.apiKey,
-        addedAt: new Date().toISOString(),
-      }),
-      channelId,
-      channelTitle,
-      workspaceId: session.workspaceId,
-      accountId,
-      accessHash,
-      apiKey: session.apiKey,
-    });
-
-    await ctx.answerCbQuery();
-
-    // Show progress message and run sync in background (avoid Telegraf timeout)
-    const progressMsg = await ctx.editMessageText(
-      l.syncProgressShort(channelTitle, 0, "?"),
-    );
-
-    const msgId =
-      typeof progressMsg === "object" && "message_id" in progressMsg
-        ? progressMsg.message_id
-        : undefined;
-
-    let lastProgressEdit = 0;
-    const onProgress = async (synced: number, total: number) => {
-      if (!msgId) return;
-      const now = Date.now();
-      if (synced < total && now - lastProgressEdit < 2000) return;
-      lastProgressEdit = now;
-      try {
-        await ctx.telegram.editMessageText(
-          chatId,
-          msgId,
-          undefined,
-          l.syncProgressShort(channelTitle, synced, total),
-        );
-      } catch {
-        // Ignore edit errors (message not modified, etc.)
-      }
-    };
-
-    const onSearchProgress: SearchProgress = async (found, reported) => {
-      if (!msgId) return;
-      const now = Date.now();
-      if (now - lastProgressEdit < 2000) return;
-      lastProgressEdit = now;
-      try {
-        await ctx.telegram.editMessageText(
-          chatId,
-          msgId,
-          undefined,
-          l.syncSearching(channelTitle, found, reported ?? "?"),
-        );
-      } catch {
-        // Ignore edit errors (message not modified, etc.)
-      }
-    };
-
-    // Run sync in background to avoid Telegraf 90s callback timeout
-    void (async () => {
-    try {
-      const result = await bulkSync({
-        client,
-        workspaceId: session.workspaceId,
         accountId,
-        channelId,
         accessHash,
-        onProgress,
-        onSearchProgress,
+        apiKey: session.apiKey,
       });
 
-      // Update config with sync metadata
-      const channelConfig = config.getChannelConfig(channelId);
-      if (channelConfig) {
-        config.setChannelConfig(channelId, {
-          ...channelConfig,
-          lastSyncAt: new Date().toISOString(),
-          subscriberCount: result.total,
-        });
-      }
-
-      const completionText = [
-        l.syncComplete(channelTitle),
-        l.syncNewContacts(result.created),
-        l.syncExisting(result.existing),
-        l.syncPrivate(result.private),
-        l.syncFailedCount(result.failed),
-        l.syncCheckCrm,
-      ].join("\n");
-
-      if (msgId) {
-        await ctx.telegram.editMessageText(
-          chatId,
-          msgId,
-          undefined,
-          completionText,
-        );
-      }
-    } catch (err) {
-      console.error(`[sync_now] Error syncing channel ${channelId}:`, err);
-      const errorText = l.syncFailed(channelTitle, localizeBotError(err, l));
-      if (msgId) {
+      let lastProgressEdit = 0;
+      const onProgress = async (synced: number, total: number) => {
+        if (!msgId) return;
+        const now = Date.now();
+        if (synced < total && now - lastProgressEdit < 2000) return;
+        lastProgressEdit = now;
         try {
           await ctx.telegram.editMessageText(
             chatId,
             msgId,
             undefined,
-            errorText,
+            l.syncProgressShort(channelTitle, synced, total),
           );
         } catch {
-          // Ignore
+          // Ignore edit errors (message not modified, etc.)
         }
+      };
+
+      const onSearchProgress: SearchProgress = async (found, reported) => {
+        if (!msgId) return;
+        const now = Date.now();
+        if (now - lastProgressEdit < 2000) return;
+        lastProgressEdit = now;
+        try {
+          await ctx.telegram.editMessageText(
+            chatId,
+            msgId,
+            undefined,
+            l.syncSearching(channelTitle, found, reported ?? "?"),
+          );
+        } catch {
+          // Ignore edit errors (message not modified, etc.)
+        }
+      };
+
+      // Run sync in background to avoid Telegraf 90s callback timeout.
+      // From here the background task owns the claim and releases it when done.
+      handedOff = true;
+      void (async () => {
+      try {
+        const result = await bulkSync({
+          client,
+          workspaceId: session.workspaceId,
+          accountId,
+          channelId,
+          accessHash,
+          signal: abortController.signal,
+          onProgress,
+          onSearchProgress,
+        });
+
+        // Update config with sync metadata
+        const channelConfig = config.getChannelConfig(channelId);
+        if (channelConfig) {
+          config.setChannelConfig(channelId, {
+            ...channelConfig,
+            lastSyncAt: new Date().toISOString(),
+            subscriberCount: result.total,
+          });
+        }
+
+        const completionText = [
+          l.syncComplete(channelTitle),
+          l.syncNewContacts(result.created),
+          l.syncExisting(result.existing),
+          l.syncPrivate(result.private),
+          l.syncFailedCount(result.failed),
+          l.syncCheckCrm,
+        ].join("\n");
+
+        if (msgId) {
+          await ctx.telegram.editMessageText(
+            chatId,
+            msgId,
+            undefined,
+            completionText,
+          );
+        }
+      } catch (err) {
+        console.error(`[sync_now] Error syncing channel ${channelId}:`, err);
+        const errorText = l.syncFailed(channelTitle, localizeBotError(err, l));
+        if (msgId) {
+          try {
+            await ctx.telegram.editMessageText(
+              chatId,
+              msgId,
+              undefined,
+              errorText,
+            );
+          } catch {
+            // Ignore
+          }
+        }
+      } finally {
+        releaseSync(channelId, abortController);
       }
+      })(); // end background sync IIFE
+    } finally {
+      // Any exit before the background task took over must free the channel.
+      if (!handedOff) releaseSync(channelId, abortController);
     }
-    })(); // end background sync IIFE
   });
 
   bot.action(/^settings_first:(-?\d+)$/, async (ctx) => {
